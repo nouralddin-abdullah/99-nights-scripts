@@ -391,7 +391,12 @@ local SkybaseControl = {
     SmartAutoEatEnabled = false,
     HungerThreshold = 50, -- Default hunger threshold
     LastHungerCheck = 0,
-    HungerCheckCooldown = 5 -- Check every 5 seconds to avoid spam
+    HungerCheckCooldown = 5, -- Check every 5 seconds to avoid spam
+    -- Anti-AFK variables
+    AntiAfkEnabled = false,
+    AntiAfkConnection = nil,
+    LastJumpTime = 0,
+    JumpInterval = 300 -- 5 minutes (300 seconds)
 }
 
 -- Lost Children control state
@@ -840,8 +845,8 @@ local function UltimateItemTransporter(targetItem, destinationPart, trackingTabl
         -- Check if item was recently teleported (if tracking is enabled)
         if trackingTable and trackingTable[targetItem] then
             local timeSince = tick() - trackingTable[targetItem]
-            print("⏰ Item was teleported " .. math.floor(timeSince) .. " seconds ago (cooldown: " .. (teleportCooldown or 30) .. "s)")
-            if timeSince < (teleportCooldown or 30) then
+            print("⏰ Item was teleported " .. math.floor(timeSince) .. " seconds ago (cooldown: " .. (teleportCooldown or 120) .. "s)")
+            if timeSince < (teleportCooldown or 120) then
                 print("❌ Item still on cooldown")
                 return false, "Item recently teleported"
             end
@@ -876,7 +881,7 @@ local function UltimateItemTransporter(targetItem, destinationPart, trackingTabl
     print("✋ Claiming server authority over item...")
     local StartDraggingEvent = ReplicatedStorage.RemoteEvents.RequestStartDraggingItem
     StartDraggingEvent:FireServer(targetItem)
-    task.wait(0.1) -- Brief pause for server to register the claim
+    task.wait(0.4) -- Brief pause for server to register the claim
     
     -- Calculate destination position
     local dropPosition
@@ -902,12 +907,10 @@ local function UltimateItemTransporter(targetItem, destinationPart, trackingTabl
     targetItem.PrimaryPart.CFrame = dropPosition
     
     -- 3. Brief pause for game state to settle
-    task.wait(0.5)
+    task.wait(0.7)
     
     -- 4. Re-enable physics with zero momentum
     print("✅ Re-enabling physics with zero momentum...")
-    targetItem.PrimaryPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-    targetItem.PrimaryPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     targetItem.PrimaryPart.Anchored = false
     targetItem.PrimaryPart.CanCollide = true
     
@@ -1178,7 +1181,7 @@ local function TeleportItemToCampfire(item, itemPart)
     
     if destination then
         print("🚀 Using UltimateItemTransporter for campfire refill to " .. CampfireControl.TeleportDestination .. ": " .. item.Name)
-        local success = UltimateItemTransporter(item, destination, nil, 30, CampfireControl.SavedPlayerPosition)
+        local success = UltimateItemTransporter(item, destination, nil, 120, CampfireControl.SavedPlayerPosition)
         if success then
             print("✅ Campfire refill successful")
             return true
@@ -1220,7 +1223,7 @@ local function UpdateCampfireRefill()
     -- Clean up teleported items tracking (remove items that no longer exist)
     local validTeleportedItems = {}
     for item, timestamp in pairs(CampfireControl.TeleportedItems) do
-        if item.Parent and (currentTime - timestamp) < 30 then -- 30 second cooldown per item
+        if item.Parent and (currentTime - timestamp) < 120 then -- 30 second cooldown per item
             validTeleportedItems[item] = timestamp
         end
     end
@@ -1584,7 +1587,7 @@ local function UpdateFoodTeleport()
     -- Clean up teleported items tracking (remove items that no longer exist)
     local validTeleportedItems = {}
     for item, timestamp in pairs(FoodControl.TeleportedItems) do
-        if item.Parent and (currentTime - timestamp) < 30 then -- 30 second cooldown per item
+        if item.Parent and (currentTime - timestamp) < 120 then -- 30 second cooldown per item
             validTeleportedItems[item] = timestamp
         end
     end
@@ -1637,7 +1640,7 @@ local function UpdateFoodTeleport()
     FoodControl.TeleportedItems[item.Item] = currentTime
     print("🔒 Item marked as teleporting: " .. item.Item.Name)
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 30, FoodControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, FoodControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
     
     if success then
         print("✅ Food teleport successful")
@@ -1731,7 +1734,7 @@ local function UpdateAnimalPeltsTeleport()
     -- Clean up teleported items tracking (remove items that no longer exist)
     local validTeleportedItems = {}
     for item, timestamp in pairs(AnimalPeltsControl.TeleportedItems) do
-        if item.Parent and (currentTime - timestamp) < 30 then -- 30 second cooldown per item
+        if item.Parent and (currentTime - timestamp) < 120 then -- 30 second cooldown per item
             validTeleportedItems[item] = timestamp
         end
     end
@@ -1773,7 +1776,7 @@ local function UpdateAnimalPeltsTeleport()
     -- Mark item as being teleported IMMEDIATELY to prevent duplicate attempts
     AnimalPeltsControl.TeleportedItems[item.Item] = currentTime
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 30, AnimalPeltsControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, AnimalPeltsControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
     
     if success then
         -- Use the configurable cooldown for next teleport attempt
@@ -1845,7 +1848,7 @@ local function UpdateHealingTeleport()
     -- Clean up teleported items tracking (remove items that no longer exist)
     local validTeleportedItems = {}
     for item, timestamp in pairs(HealingControl.TeleportedItems) do
-        if item.Parent and (currentTime - timestamp) < 30 then -- 30 second cooldown per item
+        if item.Parent and (currentTime - timestamp) < 120 then -- 30 second cooldown per item
             validTeleportedItems[item] = timestamp
         end
     end
@@ -1887,7 +1890,7 @@ local function UpdateHealingTeleport()
     -- Mark item as being teleported IMMEDIATELY to prevent duplicate attempts
     HealingControl.TeleportedItems[item.Item] = currentTime
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 30, HealingControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, HealingControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
     
     if success then
         -- Use the configurable cooldown for next teleport attempt
@@ -1964,7 +1967,7 @@ local function UpdateAmmoTeleport()
     -- Clean up teleported items tracking (remove items that no longer exist)
     local validTeleportedItems = {}
     for item, timestamp in pairs(AmmoControl.TeleportedItems) do
-        if item.Parent and (currentTime - timestamp) < 30 then -- 30 second cooldown per item
+        if item.Parent and (currentTime - timestamp) < 120 then -- 30 second cooldown per item
             validTeleportedItems[item] = timestamp
         end
     end
@@ -2000,7 +2003,7 @@ local function UpdateAmmoTeleport()
     -- Mark item as being teleported IMMEDIATELY to prevent duplicate attempts
     AmmoControl.TeleportedItems[item.Item] = currentTime
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 30, AmmoControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, AmmoControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
     
     if success then
         -- Use the configurable cooldown for next teleport attempt
@@ -2651,7 +2654,7 @@ local function TeleportItemToScrapper(item, itemPart)
     end
     
     if destination then
-        local success = UltimateItemTransporter(item, destination, CraftingControl.TeleportedItems, 30, CraftingControl.SavedPlayerPosition)
+        local success = UltimateItemTransporter(item, destination, CraftingControl.TeleportedItems, 120, CraftingControl.SavedPlayerPosition)
         if success then
             return true
         else
@@ -2709,7 +2712,7 @@ local function UpdateCrafting()
         -- Clean up teleported items tracking (remove items that no longer exist)
         local validTeleportedItems = {}
         for item, timestamp in pairs(CraftingControl.TeleportedItems) do
-            if item.Parent and (currentTime - timestamp) < 30 then -- 30 second cooldown per item
+            if item.Parent and (currentTime - timestamp) < 120 then -- 30 second cooldown per item
                 validTeleportedItems[item] = timestamp
             end
         end
@@ -3677,6 +3680,38 @@ local function checkHungerAndEat()
     end
 end
 
+-- Function to check anti-AFK system and make character jump every 5 minutes
+local function checkAntiAfk()
+    -- First check if enabled
+    if not SkybaseControl.AntiAfkEnabled then 
+        return 
+    end
+    
+    local currentTime = tick()
+    if currentTime - SkybaseControl.LastJumpTime < SkybaseControl.JumpInterval then
+        return
+    end
+    
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+    local character = player.Character
+    
+    if not character then 
+        return 
+    end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then 
+        return 
+    end
+    
+    -- Make the character jump to prevent AFK kick
+    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    SkybaseControl.LastJumpTime = currentTime
+    
+    print("🦘 Anti-AFK: Character jumped to prevent kick")
+end
+
 --============================================================================--
 --      [[ LOST CHILDREN FUNCTIONS ]]
 --============================================================================--
@@ -4099,6 +4134,7 @@ end
 RunService.Heartbeat:Connect(function()
     StepUpdate()
     checkHungerAndEat() -- Check hunger every frame (but with cooldown)
+    checkAntiAfk() -- Check anti-AFK system
     
     -- Lost Children Rescue System
     if LostChildrenControl.RescueEnabled then
@@ -5496,6 +5532,21 @@ SkybaseTab:CreateSlider({
     Flag = "Skybase_HungerThreshold",
     Callback = function(v)
         SkybaseControl.HungerThreshold = v
+    end
+})
+
+SkybaseTab:CreateToggle({
+    Name = "⚡ Anti-AFK Protection",
+    CurrentValue = false,
+    Flag = "Skybase_AntiAfk",
+    Callback = function(v)
+        SkybaseControl.AntiAfkEnabled = v
+        if v then
+            SkybaseControl.LastJumpTime = tick()
+            print("Anti-AFK Enabled - Will jump every 5 minutes")
+        else
+            print("Anti-AFK Disabled")
+        end
     end
 })
 
