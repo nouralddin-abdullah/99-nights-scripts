@@ -55,6 +55,10 @@ local Window = ApocLibrary:CreateWindow({
 local InfoTab = Window:CreateTab("Information", 4483362458)
 local InfoSection = InfoTab:CreateSection("Important Information")
 
+-- Create Misc tab
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+local MiscSection = MiscTab:CreateSection("Miscellaneous")
+
 -- Single Player tab & section (as requested)
 local PlayerTab = Window:CreateTab("Player", 4483362458)
 local PlayerSection = PlayerTab:CreateSection("Player Settings")
@@ -179,6 +183,7 @@ local DisplayTranslations = {
     -- Ammo Items
     ["All Ammo"] = "All Ammo Types",
     ["Revolver Ammo"] = "Revolver Ammo",
+    ["Rifle Ammo"] = "Rifle Ammo",
     ["Shotgun Ammo"] = "Shotgun Ammo",
     
     -- Entities
@@ -442,6 +447,96 @@ local AmmoControl = {
     SavedPlayerPosition = nil -- Saved position when teleporter is enabled
 }
 
+-- Lighting control state
+local LightingControl = {
+    AlwaysDayEnabled = false,
+    Connection = nil,
+    OriginalSettings = {},
+    ColorCorrection = nil
+}
+
+-- Always Day Lighting functionality
+local function initializeLighting()
+    local Lighting = game:GetService("Lighting")
+    
+    -- Find or create the ColorCorrection effect
+    LightingControl.ColorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+    if not LightingControl.ColorCorrection then
+        LightingControl.ColorCorrection = Instance.new("ColorCorrectionEffect")
+        LightingControl.ColorCorrection.Parent = Lighting
+    end
+    
+    -- Store the game's original settings
+    LightingControl.OriginalSettings = {
+        ClockTime = Lighting.ClockTime,
+        Brightness = LightingControl.ColorCorrection.Brightness,
+        Saturation = LightingControl.ColorCorrection.Saturation,
+        TintColor = LightingControl.ColorCorrection.TintColor,
+        FogStart = Lighting.FogStart,
+        FogEnd = Lighting.FogEnd,
+        FogColor = Lighting.FogColor
+    }
+end
+
+local function applyCustomLighting()
+    local Lighting = game:GetService("Lighting")
+    local ALWAYS_DAY_SETTINGS = {
+        ClockTime = 14,
+        Brightness = 0.1,
+        Saturation = 0.05,
+        TintColor = Color3.fromRGB(255, 255, 255),
+        FogStart = 2000,
+        FogEnd = 10000,
+        FogColor = Color3.fromRGB(195, 200, 210)
+    }
+    
+    Lighting.ClockTime = ALWAYS_DAY_SETTINGS.ClockTime
+    Lighting.FogStart = ALWAYS_DAY_SETTINGS.FogStart
+    Lighting.FogEnd = ALWAYS_DAY_SETTINGS.FogEnd
+    Lighting.FogColor = ALWAYS_DAY_SETTINGS.FogColor
+    
+    LightingControl.ColorCorrection.Enabled = true
+    LightingControl.ColorCorrection.Brightness = ALWAYS_DAY_SETTINGS.Brightness
+    LightingControl.ColorCorrection.Saturation = ALWAYS_DAY_SETTINGS.Saturation
+    LightingControl.ColorCorrection.TintColor = ALWAYS_DAY_SETTINGS.TintColor
+end
+
+local function restoreOriginalLighting()
+    local Lighting = game:GetService("Lighting")
+    local original = LightingControl.OriginalSettings
+    
+    Lighting.ClockTime = original.ClockTime
+    Lighting.FogStart = original.FogStart
+    Lighting.FogEnd = original.FogEnd
+    Lighting.FogColor = original.FogColor
+    
+    LightingControl.ColorCorrection.Brightness = original.Brightness
+    LightingControl.ColorCorrection.Saturation = original.Saturation
+    LightingControl.ColorCorrection.TintColor = original.TintColor
+end
+
+local function onRenderStep()
+    if LightingControl.AlwaysDayEnabled then
+        applyCustomLighting()
+    end
+end
+
+local function toggleAlwaysDay(enabled)
+    LightingControl.AlwaysDayEnabled = enabled
+    
+    if enabled then
+        if not LightingControl.Connection then
+            LightingControl.Connection = RunService.RenderStepped:Connect(onRenderStep)
+        end
+    else
+        if LightingControl.Connection then
+            LightingControl.Connection:Disconnect()
+            LightingControl.Connection = nil
+        end
+        restoreOriginalLighting()
+    end
+end
+
 -- ESP control state
 local ESPControl = {
     Enabled = false,
@@ -581,6 +676,7 @@ local HealingItemTypes = {
 local AmmoItemTypes = {
     "All",
     "Revolver Ammo",
+    "Rifle Ammo",
     "Shotgun Ammo",
     "Fuel Canister"
 }
@@ -4097,58 +4193,6 @@ local function bagChild(child, sack)
     return false
 end
 
--- Function to drop child at campfire
-local function dropChildAtCampfire(sack)
-    -- Find campfire position (using existing campfire detection)
-    local campfirePosition = nil
-    local structuresFolder = workspace:FindFirstChild("Structures")
-    
-    if structuresFolder then
-        for _, structure in pairs(structuresFolder:GetChildren()) do
-            if structure.Name:find("Campfire") then
-                local part = structure:FindFirstChild("Fire") or structure.PrimaryPart
-                if part then
-                    campfirePosition = part.Position
-                    break
-                end
-            end
-        end
-    end
-    
-    if not campfirePosition then
-        return false
-    end
-    
-    -- Teleport to campfire first
-    teleportPlayer(campfirePosition + Vector3.new(0, 10, 0))
-    
-    task.wait(1) -- Wait for teleport to complete
-    
-    -- Drop child with offset (30 studs back and 30 studs up)
-    local dropPosition = campfirePosition + Vector3.new(0, 30, -30)
-    
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local bagDropRemote = ReplicatedStorage:FindFirstChild("RemoteEvents")
-    
-    if bagDropRemote then
-        bagDropRemote = bagDropRemote:FindFirstChild("RequestBagDropItem")
-        if bagDropRemote then
-            -- Find any item for the drop (we'll use carrot as example)
-            local itemsFolder = workspace:FindFirstChild("Items")
-            local dummyItem = itemsFolder and itemsFolder:FindFirstChild("Carrot")
-            
-            if dummyItem then
-                local success = pcall(function()
-                    bagDropRemote:FireServer(sack, dummyItem, true)
-                end)
-                return success
-            end
-        end
-    end
-    
-    return false
-end
-
 -- Function to perform rescue sequence
 local function performRescueSequence()
     if not LostChildrenControl.RescueEnabled then return end
@@ -4685,6 +4729,21 @@ local function destroySkybaseGui()
         SkybaseControl.PlatformModel = nil
     end
 end
+
+-- Initialize lighting system
+initializeLighting()
+
+-- Misc GUI Controls
+MiscTab:CreateLabel("After turning it off make sure to visit the campfire to restart the real time lighting")
+
+MiscTab:CreateToggle({
+    Name = "Always Day Light",
+    CurrentValue = false,
+    Flag = "Misc_AlwaysDayLight",
+    Callback = function(v)
+        toggleAlwaysDay(v)
+    end
+})
 
 -- Player GUI Controls
 PlayerTab:CreateToggle({
@@ -5839,7 +5898,7 @@ local function createSaplingsGUI()
         MAX_SPACING = 20,
         DEFAULT_HEIGHT_OFFSET = 0.5,
         MIN_HEIGHT_OFFSET = 0,
-        MAX_HEIGHT_OFFSET = 20,
+        MAX_HEIGHT_OFFSET = 50,
         HIGHLIGHT_COLOR = Color3.fromRGB(120, 255, 120)
     }
     
@@ -6060,16 +6119,16 @@ local function createSaplingsGUI()
     screenGui.Name = "SaplingPlanterEnhanced"
     screenGui.ResetOnSpawn = false
     
-    -- Main container with shadow effect
-    local shadowFrame = createRoundedFrame(screenGui, UDim2.new(0, 300, 0, 450), UDim2.new(0, 15, 0.5, -225), Color3.fromRGB(0, 0, 0), 12)
+    -- Main container with shadow effect (Mobile-optimized size)
+    local shadowFrame = createRoundedFrame(screenGui, UDim2.new(0, 260, 0, 380), UDim2.new(0, 15, 0.5, -190), Color3.fromRGB(0, 0, 0), 12)
     shadowFrame.BackgroundTransparency = 0.7
     
-    local mainFrame = createRoundedFrame(screenGui, UDim2.new(0, 290, 0, 440), UDim2.new(0, 10, 0.5, -220), THEME.COLORS.BACKGROUND, 12)
+    local mainFrame = createRoundedFrame(screenGui, UDim2.new(0, 250, 0, 370), UDim2.new(0, 10, 0.5, -185), THEME.COLORS.BACKGROUND, 12)
     
     -- Minimize state variables
     local isMinimized = false
     local originalSize = mainFrame.Size
-    local minimizedSize = UDim2.new(0, 290, 0, 50)
+    local minimizedSize = UDim2.new(0, 250, 0, 50)
     
     -- Header with gradient and dragging functionality
     local headerFrame = createRoundedFrame(mainFrame, UDim2.new(1, -20, 0, 50), UDim2.new(0, 10, 0, 10), THEME.COLORS.PRIMARY, 8)
@@ -6124,7 +6183,7 @@ local function createSaplingsGUI()
     minimizeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         local targetSize = isMinimized and minimizedSize or originalSize
-        local targetShadowSize = isMinimized and UDim2.new(0, 300, 0, 60) or UDim2.new(0, 300, 0, 450)
+        local targetShadowSize = isMinimized and UDim2.new(0, 260, 0, 60) or UDim2.new(0, 260, 0, 380)
         
         minimizeBtn.Text = isMinimized and "+" or "–"
         contentFrame.Visible = not isMinimized
@@ -6152,8 +6211,8 @@ local function createSaplingsGUI()
     local dropdownIcon = createLabel(shapeDropdown, UDim2.new(0, 20, 1, 0), UDim2.new(1, -25, 0, 0), "▼", THEME.COLORS.TEXT_SECONDARY, 10)
     dropdownIcon.TextXAlignment = Enum.TextXAlignment.Center
     
-    -- Create dropdown at screen level with higher ZIndex to fix overlap issue
-    local shapeOptionsFrame = createRoundedFrame(screenGui, UDim2.new(0, 260, 0, 90), UDim2.new(0, 25, 0, 200), THEME.COLORS.SECONDARY, 4)
+    -- Create dropdown at screen level with higher ZIndex to fix overlap issue (Mobile-optimized)
+    local shapeOptionsFrame = createRoundedFrame(screenGui, UDim2.new(0, 220, 0, 90), UDim2.new(0, 25, 0, 200), THEME.COLORS.SECONDARY, 4)
     shapeOptionsFrame.Visible = false
     shapeOptionsFrame.ClipsDescendants = true
     shapeOptionsFrame.ZIndex = 12  -- High z-index for dropdown container
@@ -6231,15 +6290,15 @@ local function createSaplingsGUI()
         end)
     end
     
-    -- Enhanced slider creation function
+    -- Enhanced slider creation function (Mobile-optimized)
     local function createEnhancedSlider(parent, text, yPos, min, max, default, suffix)
-        local sliderFrame = createRoundedFrame(parent, UDim2.new(1, -20, 0, 55), UDim2.new(0, 10, 0, yPos), THEME.COLORS.SURFACE, 6)
+        local sliderFrame = createRoundedFrame(parent, UDim2.new(1, -20, 0, 50), UDim2.new(0, 10, 0, yPos), THEME.COLORS.SURFACE, 6)
         
-        local label = createLabel(sliderFrame, UDim2.new(1, -15, 0, 18), UDim2.new(0, 15, 0, 5), text, THEME.COLORS.TEXT_SECONDARY, 12, Enum.Font.GothamMedium)
-        local valueLabel = createLabel(sliderFrame, UDim2.new(0, 80, 0, 18), UDim2.new(1, -95, 0, 5), default .. (suffix or ""), THEME.COLORS.TEXT, 12, Enum.Font.GothamBold)
+        local label = createLabel(sliderFrame, UDim2.new(1, -15, 0, 16), UDim2.new(0, 10, 0, 3), text, THEME.COLORS.TEXT_SECONDARY, 11, Enum.Font.GothamMedium)
+        local valueLabel = createLabel(sliderFrame, UDim2.new(0, 70, 0, 16), UDim2.new(1, -80, 0, 3), default .. (suffix or ""), THEME.COLORS.TEXT, 11, Enum.Font.GothamBold)
         valueLabel.TextXAlignment = Enum.TextXAlignment.Right
         
-        local track = createRoundedFrame(sliderFrame, UDim2.new(1, -30, 0, 6), UDim2.new(0, 15, 0, 35), THEME.COLORS.BACKGROUND, 3)
+        local track = createRoundedFrame(sliderFrame, UDim2.new(1, -20, 0, 6), UDim2.new(0, 10, 0, 28), THEME.COLORS.BACKGROUND, 3)
         local progress = createRoundedFrame(track, UDim2.new((default - min) / (max - min), 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.COLORS.PRIMARY, 3)
         
         local handle = Instance.new("TextButton")
@@ -6286,10 +6345,10 @@ local function createSaplingsGUI()
         return updateValue
     end
     
-    -- Create enhanced sliders
-    local updateSize = createEnhancedSlider(contentFrame, "Dimension", 75, CONFIG.MIN_SIZE, CONFIG.MAX_SIZE, CONFIG.DEFAULT_SIZE, " studs")
-    local updateSpacing = createEnhancedSlider(contentFrame, "Spacing", 140, CONFIG.MIN_SPACING, CONFIG.MAX_SPACING, CONFIG.DEFAULT_SPACING, " studs") 
-    local updateHeight = createEnhancedSlider(contentFrame, "Height Offset", 205, CONFIG.MIN_HEIGHT_OFFSET, CONFIG.MAX_HEIGHT_OFFSET, CONFIG.DEFAULT_HEIGHT_OFFSET, " units")
+    -- Create enhanced sliders (Mobile-optimized spacing)
+    local updateSize = createEnhancedSlider(contentFrame, "Dimension", 65, CONFIG.MIN_SIZE, CONFIG.MAX_SIZE, CONFIG.DEFAULT_SIZE, " studs")
+    local updateSpacing = createEnhancedSlider(contentFrame, "Spacing", 125, CONFIG.MIN_SPACING, CONFIG.MAX_SPACING, CONFIG.DEFAULT_SPACING, " studs") 
+    local updateHeight = createEnhancedSlider(contentFrame, "Height Offset", 185, CONFIG.MIN_HEIGHT_OFFSET, CONFIG.MAX_HEIGHT_OFFSET, CONFIG.DEFAULT_HEIGHT_OFFSET, " units")
     
     -- Handle slider updates
     UserInputService.InputChanged:Connect(function(input)
@@ -6328,21 +6387,21 @@ local function createSaplingsGUI()
         end
     end)
     
-    -- Action buttons section
-    local buttonSection = createRoundedFrame(contentFrame, UDim2.new(1, -20, 0, 80), UDim2.new(0, 10, 0, 275), THEME.COLORS.SURFACE, 6)
+    -- Action buttons section (Mobile-optimized)
+    local buttonSection = createRoundedFrame(contentFrame, UDim2.new(1, -20, 0, 70), UDim2.new(0, 10, 0, 245), THEME.COLORS.SURFACE, 6)
     
-    local previewBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 30), UDim2.new(0, 10, 0, 10), "🔍 Preview", THEME.COLORS.PRIMARY, THEME.COLORS.TEXT, previewShape)
-    local clearBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 30), UDim2.new(0.52, 0, 0, 10), "🗑️ Clear", THEME.COLORS.DANGER, THEME.COLORS.TEXT, clearShape)
+    local previewBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 28), UDim2.new(0, 10, 0, 8), "🔍 Preview", THEME.COLORS.PRIMARY, THEME.COLORS.TEXT, previewShape)
+    local clearBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 28), UDim2.new(0.52, 0, 0, 8), "🗑️ Clear", THEME.COLORS.DANGER, THEME.COLORS.TEXT, clearShape)
     
-    -- Progress display
-    local progressFrame = createRoundedFrame(buttonSection, UDim2.new(1, -20, 0, 25), UDim2.new(0, 10, 0, 45), THEME.COLORS.BACKGROUND, 4)
-    local progressLabel = createLabel(progressFrame, UDim2.new(1, -15, 1, 0), UDim2.new(0, 15, 0, 0), "Progress: N/A", THEME.COLORS.TEXT, 13, Enum.Font.GothamMedium)
+    -- Progress display (Mobile-optimized)
+    local progressFrame = createRoundedFrame(buttonSection, UDim2.new(1, -20, 0, 22), UDim2.new(0, 10, 0, 42), THEME.COLORS.BACKGROUND, 4)
+    local progressLabel = createLabel(progressFrame, UDim2.new(1, -15, 1, 0), UDim2.new(0, 15, 0, 0), "Progress: N/A", THEME.COLORS.TEXT, 12, Enum.Font.GothamMedium)
     progressLabel.TextXAlignment = Enum.TextXAlignment.Center
     guiElements.ProgressLabel = progressLabel
     
-    -- Plant/Stop buttons
-    local plantBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 35), UDim2.new(0, 10, 0, 365), "🌱 Start Planting", THEME.COLORS.SUCCESS, THEME.COLORS.TEXT, nil)
-    local stopBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 35), UDim2.new(0, 10, 0, 365), "⏹️ Stop Planting", THEME.COLORS.WARNING, THEME.COLORS.TEXT, nil)
+    -- Plant/Stop buttons (Mobile-optimized)
+    local plantBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 30), UDim2.new(0, 10, 0, 325), "🌱 Start Planting", THEME.COLORS.SUCCESS, THEME.COLORS.TEXT, nil)
+    local stopBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 30), UDim2.new(0, 10, 0, 325), "⏹️ Stop Planting", THEME.COLORS.WARNING, THEME.COLORS.TEXT, nil)
     stopBtn.Visible = false
     
     local function setButtons(canPlant) 
