@@ -363,6 +363,7 @@ local CampfireControl = {
     RefillPercentage = 25, -- Percentage threshold to trigger refill
     RefillItemType = "All", -- What items to use for refilling
     TeleportDestination = "Campfire", -- Where to teleport items (default: Campfire)
+    TeleportHeight = 35, -- Height for teleportation (0-50 studs)
     LastRefillCheck = 0,
     RefillCheckCooldown = 1, -- Configurable cooldown (0.5-2 seconds)
     DebugMode = false, -- Disabled debug messages
@@ -388,6 +389,7 @@ local CraftingControl = {
     WoodItemType = "All", -- What items to use for wood production (should be logs)
     CultistGemItemType = "All", -- What items to use for cultist gem production
     TeleportDestination = "Scrapper", -- Where to teleport items (default: Scrapper)
+    TeleportHeight = 35, -- Height for teleportation (0-50 studs)
     LastCraftingCheck = 0,
     ScrapCooldown = 1.5, -- Fixed cooldown for scrap production (3.5 seconds)
     WoodCooldown = 1.5, -- Fixed cooldown for wood production (2 seconds)
@@ -404,6 +406,7 @@ local FoodControl = {
     TeleportFoodEnabled = false,
     TeleportDestination = "Player", -- "Player" or "Campfire"
     FoodItemType = "All", -- What food items to teleport
+    TeleportHeight = 35, -- Height for teleportation (0-50 studs)
     LastFoodTeleport = 0,
     TeleportCooldown = 1, -- Configurable cooldown (0.5-5 seconds)
     DebugMode = false, -- Disabled debug messages
@@ -416,6 +419,7 @@ local AnimalPeltsControl = {
     TeleportPeltsEnabled = false,
     TeleportDestination = "Player", -- "Player" or "Campfire"
     PeltItemType = "Bunny Foot", -- What pelt items to teleport
+    TeleportHeight = 35, -- Height for teleportation (0-50 studs)
     LastPeltTeleport = 0,
     TeleportCooldown = 1, -- Configurable cooldown (0.5-5 seconds)
     DebugMode = false, -- Disabled debug messages
@@ -428,6 +432,7 @@ local HealingControl = {
     TeleportHealingEnabled = false,
     TeleportDestination = "Player", -- "Player" or "Campfire"
     HealingItemType = "Bandage", -- What healing items to teleport
+    TeleportHeight = 35, -- Height for teleportation (0-50 studs)
     LastHealingTeleport = 0,
     TeleportCooldown = 1, -- Configurable cooldown (0.5-5 seconds)
     DebugMode = false, -- Disabled debug messages
@@ -440,6 +445,7 @@ local AmmoControl = {
     TeleportAmmoEnabled = false,
     TeleportDestination = "Player", -- "Player" only for ammo
     AmmoItemType = "All", -- What ammo items to teleport
+    TeleportHeight = 35, -- Height for teleportation (0-50 studs)
     LastAmmoTeleport = 0,
     TeleportCooldown = 1, -- Configurable cooldown (0.5-5 seconds)
     DebugMode = false, -- Disabled debug messages
@@ -1045,171 +1051,87 @@ local function isSackFull()
 end
 
 -- Ultimate Item Transporter Function
-local function UltimateItemTransporter(targetItem, destinationPart, trackingTable, teleportCooldown, savedPlayerPosition)
-    if not targetItem or not destinationPart then
-        return false, "Missing required parameters"
+local function UltimateItemTransporter(targetItem, destinationPart, trackingTable, teleportCooldown, savedPlayerPosition, teleportHeight)
+    if not targetItem or not targetItem.Parent then
+        return false
     end
     
-    -- Check if teleportation system is busy
-    if TeleportationControl.IsBusy then
-        local timeSinceBusy = tick() - TeleportationControl.StartTime
-        if timeSinceBusy < 10 then -- 10 second timeout
-            print("⏳ Teleportation system busy with: " .. (TeleportationControl.CurrentItem and TeleportationControl.CurrentItem.Name or "unknown item"))
-            return false, "Teleportation system busy"
-        else
-            -- Force reset if stuck for more than 10 seconds
-            print("🔄 Teleportation system timeout - forcing reset")
-            TeleportationControl.IsBusy = false
-            TeleportationControl.CurrentItem = nil
-        end
-    end
-    
-    -- Set teleportation system as busy
-    TeleportationControl.IsBusy = true
-    TeleportationControl.CurrentItem = targetItem
-    TeleportationControl.StartTime = tick()
-    print("🔒 Teleportation system locked for: " .. targetItem.Name)
-    
-    -- Validate the target item exists
-    if not targetItem.Parent then
-        warn("❌ Target item no longer exists!")
-        -- Release the lock
-        TeleportationControl.IsBusy = false
-        TeleportationControl.CurrentItem = nil
-        return false, "Item not found"
-    end
-    
-    -- Get character and HumanoidRootPart
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then
-        warn("❌ Player's HumanoidRootPart not found!")
-        -- Release the lock
-        TeleportationControl.IsBusy = false
-        TeleportationControl.CurrentItem = nil
-        return false, "Character not found"
+        return false
     end
-    local HumanoidRootPart = char.HumanoidRootPart
     
-    -- Wrap the entire teleportation process in error handling
-    local success, result = pcall(function()
-        -- Check if item was recently teleported (if tracking is enabled)
-        if trackingTable and trackingTable[targetItem] then
-            local timeSince = tick() - trackingTable[targetItem]
-            print("⏰ Item was teleported " .. math.floor(timeSince) .. " seconds ago (cooldown: " .. (teleportCooldown or 120) .. "s)")
-            if timeSince < (teleportCooldown or 120) then
-                print("❌ Item still on cooldown")
-                return false, "Item recently teleported"
-            end
+    local rootPart = char.HumanoidRootPart
+    local itemPart = targetItem.PrimaryPart or targetItem:FindFirstChildOfClass("BasePart")
+    
+    if not itemPart then
+        return false
+    end
+    
+    -- Use provided height or default to 35
+    local height = teleportHeight or 35
+    local destinationCFrame = nil
+    
+    if destinationPart == "Player" then
+        if savedPlayerPosition then
+            destinationCFrame = savedPlayerPosition * CFrame.new(0, height, 0)
         else
-            print("🆕 Item not found in tracking table - proceeding with teleport")
+            destinationCFrame = rootPart.CFrame * CFrame.new(0, height, 0)
         end
-    
-    print("✅ Found item: " .. targetItem.Name)
-    if destinationPart == "Player" or tostring(destinationPart) == "Player" then
-        print("✅ Destination: Player position")
-    elseif typeof(destinationPart) == "CFrame" then
-        print("✅ Destination: Saved player position")
-    else
-        print("✅ Found destination: " .. destinationPart:GetFullName())
-    end
-    
-    -- Store original player position for "Player" destination
-    local originalPlayerPosition = savedPlayerPosition or HumanoidRootPart.CFrame
-    
-    -- 1. Teleport player to the item location
-    print("➡️ Teleporting player to item...")
-    -- Ensure camera stays frozen during player teleportation
-    local cameraWasFrozen = CameraControl.IsFrozen
-    if cameraWasFrozen then
-        print("📷 Camera is frozen - maintaining frozen state during teleportation")
-    end
-    
-    HumanoidRootPart.CFrame = targetItem:GetPivot() * CFrame.new(0, 0, 3)
-    task.wait(0.2) -- Wait for teleport to settle
-    
-    -- 2. Claim server authority over the item (without dragging)
-    print("✋ Claiming server authority over item...")
-    local StartDraggingEvent = ReplicatedStorage.RemoteEvents.RequestStartDraggingItem
-    StartDraggingEvent:FireServer(targetItem)
-    task.wait(0.4) -- Brief pause for server to register the claim
-    
-    -- Calculate destination position
-    local dropPosition
-    if destinationPart == "Player" or tostring(destinationPart) == "Player" then
-        dropPosition = originalPlayerPosition * CFrame.new(0, 2, -3)
-    elseif typeof(destinationPart) == "CFrame" then
-        dropPosition = destinationPart * CFrame.new(0, 35, -3)
-    else
-        dropPosition = destinationPart:GetPivot() * CFrame.new(0, 35, 0)
-    end
-    
-    -- NEW SIMPLE METHOD: Direct Item Transport
-    -- This bypasses all the complex physics and directly places the item
-    print("� Direct Transport Method - Simple & Efficient")
-    
-    -- 1. Remove item from physics simulation temporarily
-    print("⏸️ Temporarily disabling physics...")
-    targetItem.PrimaryPart.Anchored = true
-    targetItem.PrimaryPart.CanCollide = false
-    
-    -- 2. Instantly position item at destination
-    print("� Teleporting item to: " .. tostring(dropPosition))
-    targetItem.PrimaryPart.CFrame = dropPosition
-    
-    -- 3. Brief pause for game state to settle
-    task.wait(0.7)
-    
-    -- 4. Re-enable physics with zero momentum
-    print("✅ Re-enabling physics with zero momentum...")
-    targetItem.PrimaryPart.Anchored = false
-    targetItem.PrimaryPart.CanCollide = true
-    
-    -- 5. Release server authority over the item
-    print("🤝 Releasing server authority...")
-    local StopDraggingEvent = ReplicatedStorage.RemoteEvents.StopDraggingItem
-    StopDraggingEvent:FireServer(targetItem)
-    
-    print("✨ Direct transport complete!")
+    elseif typeof(destinationPart) == "Instance" then
+        local targetPart = nil
+        if destinationPart:IsA("BasePart") then
+            targetPart = destinationPart
+        elseif destinationPart:IsA("Model") then
+            targetPart = destinationPart.PrimaryPart or destinationPart:FindFirstChildOfClass("BasePart")
+        end
         
-    -- 6. Mark item as teleported with timestamp
-    if trackingTable then
+        if targetPart then
+            destinationCFrame = targetPart.CFrame * CFrame.new(0, height, 0)
+        else
+            return false
+        end
+    else
+        return false
+    end
+    
+    itemPart.CFrame = destinationCFrame
+    itemPart.AssemblyLinearVelocity = Vector3.zero
+    itemPart.AssemblyAngularVelocity = Vector3.zero
+    
+    rootPart.CFrame = destinationCFrame * CFrame.new(0, 5, 0)
+    
+    task.wait(0.1)
+    
+    local remoteEvents = game:GetService("ReplicatedStorage"):FindFirstChild("RemoteEvents")
+    if remoteEvents then
+        local requestStartDragging = remoteEvents:FindFirstChild("RequestStartDraggingItem")
+        if requestStartDragging then
+            pcall(function()
+                requestStartDragging:FireServer(targetItem)
+            end)
+        end
+    end
+    
+    local proximityPrompt = targetItem:FindFirstChildOfClass("ProximityPrompt", true)
+    if proximityPrompt then
+        pcall(function()
+            fireproximityprompt(proximityPrompt)
+        end)
+    end
+    
+    local clickDetector = targetItem:FindFirstChildOfClass("ClickDetector", true)
+    if clickDetector then
+        pcall(function()
+            fireclickdetector(clickDetector)
+        end)
+    end
+    
+    if trackingTable and targetItem then
         trackingTable[targetItem] = tick()
-        print("✅ Item marked as teleported: " .. targetItem.Name)
-    else
-        print("⚠️ No tracking table provided - item not marked!")
     end
     
-    -- 7. Return player to destination area (for visual confirmation)
-    if destinationPart ~= "Player" and typeof(destinationPart) ~= "CFrame" then
-        print("🔄 Moving player to destination area...")
-        HumanoidRootPart.CFrame = destinationPart:GetPivot() * CFrame.new(0, 5, 5)
-    else
-        print("🏠 Returning player to original position...")
-        HumanoidRootPart.CFrame = originalPlayerPosition
-    end
-    
-    -- Verify camera is still frozen after teleportation
-    if cameraWasFrozen and CameraControl.IsFrozen then
-        print("📷 Camera remained frozen throughout teleportation ✅")
-    elseif cameraWasFrozen and not CameraControl.IsFrozen then
-        print("📷 ⚠️ Camera became unfrozen during teleportation - this shouldn't happen!")
-    end
-    
-    return true, "Item successfully teleported"
-    end)
-    
-    -- Release teleportation system lock (always, even on error)
-    TeleportationControl.IsBusy = false
-    TeleportationControl.CurrentItem = nil
-    print("🔓 Teleportation system unlocked")
-    
-    -- Return result
-    if success then
-        return result
-    else
-        warn("❌ Teleportation error: " .. tostring(result))
-        return false, "Teleportation failed: " .. tostring(result)
-    end
+    return true
 end
 
 -- Simple Sack Refill Process
@@ -1431,7 +1353,7 @@ local function TeleportItemToCampfire(item, itemPart)
     
     if destination then
         print("🚀 Using UltimateItemTransporter for campfire refill to " .. CampfireControl.TeleportDestination .. ": " .. item.Name)
-        local success = UltimateItemTransporter(item, destination, nil, 120, CampfireControl.SavedPlayerPosition)
+        local success = UltimateItemTransporter(item, destination, nil, 120, CampfireControl.SavedPlayerPosition, CampfireControl.TeleportHeight)
         if success then
             print("✅ Campfire refill successful")
             return true
@@ -1767,12 +1689,7 @@ end
 -- Destination functions for UltimateItemTransporter
 local function GetFoodDestination()
     if FoodControl.TeleportDestination == "Player" then
-        -- Use saved player position if available, otherwise current position
-        if FoodControl.SavedPlayerPosition then
-            return FoodControl.SavedPlayerPosition
-        else
-            return "Player"
-        end
+        return "Player"
     elseif FoodControl.TeleportDestination == "Campfire" then
         return workspace.Map.Campground.MainFire
     end
@@ -1781,12 +1698,7 @@ end
 
 local function GetAnimalPeltsDestination()
     if AnimalPeltsControl.TeleportDestination == "Player" then
-        -- Use saved player position if available, otherwise current position
-        if AnimalPeltsControl.SavedPlayerPosition then
-            return AnimalPeltsControl.SavedPlayerPosition
-        else
-            return "Player"
-        end
+        return "Player"
     elseif AnimalPeltsControl.TeleportDestination == "Campfire" then
         return workspace.Map.Campground.MainFire
     end
@@ -1795,12 +1707,7 @@ end
 
 local function GetHealingDestination()
     if HealingControl.TeleportDestination == "Player" then
-        -- Use saved player position if available, otherwise current position
-        if HealingControl.SavedPlayerPosition then
-            return HealingControl.SavedPlayerPosition
-        else
-            return "Player"
-        end
+        return "Player"
     elseif HealingControl.TeleportDestination == "Campfire" then
         return workspace.Map.Campground.MainFire
     end
@@ -1809,12 +1716,7 @@ end
 
 local function GetAmmoDestination()
     if AmmoControl.TeleportDestination == "Player" then
-        -- Use saved player position if available, otherwise current position
-        if AmmoControl.SavedPlayerPosition then
-            return AmmoControl.SavedPlayerPosition
-        else
-            return "Player"
-        end
+        return "Player"
     elseif AmmoControl.TeleportDestination == "Campfire" then
         return workspace.Map.Campground.MainFire
     end
@@ -1890,7 +1792,7 @@ local function UpdateFoodTeleport()
     FoodControl.TeleportedItems[item.Item] = currentTime
     print("🔒 Item marked as teleporting: " .. item.Item.Name)
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 120, FoodControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, FoodControl.SavedPlayerPosition, FoodControl.TeleportHeight) -- Pass nil for tracking since we handle it here
     
     if success then
         print("✅ Food teleport successful")
@@ -2026,7 +1928,7 @@ local function UpdateAnimalPeltsTeleport()
     -- Mark item as being teleported IMMEDIATELY to prevent duplicate attempts
     AnimalPeltsControl.TeleportedItems[item.Item] = currentTime
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 120, AnimalPeltsControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, AnimalPeltsControl.SavedPlayerPosition, AnimalPeltsControl.TeleportHeight) -- Pass nil for tracking since we handle it here
     
     if success then
         -- Use the configurable cooldown for next teleport attempt
@@ -2140,7 +2042,7 @@ local function UpdateHealingTeleport()
     -- Mark item as being teleported IMMEDIATELY to prevent duplicate attempts
     HealingControl.TeleportedItems[item.Item] = currentTime
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 120, HealingControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, HealingControl.SavedPlayerPosition, HealingControl.TeleportHeight) -- Pass nil for tracking since we handle it here
     
     if success then
         -- Use the configurable cooldown for next teleport attempt
@@ -2253,7 +2155,7 @@ local function UpdateAmmoTeleport()
     -- Mark item as being teleported IMMEDIATELY to prevent duplicate attempts
     AmmoControl.TeleportedItems[item.Item] = currentTime
     
-    local success = UltimateItemTransporter(item.Item, destination, nil, 120, AmmoControl.SavedPlayerPosition) -- Pass nil for tracking since we handle it here
+    local success = UltimateItemTransporter(item.Item, destination, nil, 120, AmmoControl.SavedPlayerPosition, AmmoControl.TeleportHeight) -- Pass nil for tracking since we handle it here
     
     if success then
         -- Use the configurable cooldown for next teleport attempt
@@ -2910,7 +2812,7 @@ local function TeleportItemToScrapper(item, itemPart)
     end
     
     if destination then
-        local success = UltimateItemTransporter(item, destination, CraftingControl.TeleportedItems, 120, CraftingControl.SavedPlayerPosition)
+        local success = UltimateItemTransporter(item, destination, CraftingControl.TeleportedItems, 120, CraftingControl.SavedPlayerPosition, CraftingControl.TeleportHeight)
         if success then
             return true
         else
@@ -4471,11 +4373,11 @@ local function createSkybaseGui()
     screenGui.ResetOnSpawn = false
     SkybaseControl.SkybaseGui = screenGui
 
-    -- Main Frame (draggable)
+    -- Main Frame (draggable) - Extra small size for mobile compatibility
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 280, 0, 360)
-    mainFrame.Position = UDim2.new(0.5, -140, 0.5, -180)
+    mainFrame.Size = UDim2.new(0, 180, 0, 220)
+    mainFrame.Position = UDim2.new(0.5, -90, 0.5, -110)
     mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
@@ -5018,6 +4920,18 @@ CampfireTab:CreateDropdown({
     end
 })
 
+CampfireTab:CreateSlider({
+    Name = "Teleport Height",
+    Range = {0, 50},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 35,
+    Flag = "Campfire_TeleportHeight",
+    Callback = function(v)
+        CampfireControl.TeleportHeight = v
+    end
+})
+
 CampfireTab:CreateToggle({
     Name = "Smart Auto Refill (By %)",
     CurrentValue = false,
@@ -5127,6 +5041,18 @@ CraftingTab:CreateDropdown({
                 break
             end
         end
+    end
+})
+
+CraftingTab:CreateSlider({
+    Name = "Teleport Height",
+    Range = {0, 50},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 35,
+    Flag = "Crafting_TeleportHeight",
+    Callback = function(v)
+        CraftingControl.TeleportHeight = v
     end
 })
 
@@ -5281,6 +5207,18 @@ FoodTab:CreateDropdown({
 })
 
 FoodTab:CreateSlider({
+    Name = "Teleport Height",
+    Range = {0, 50},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 35,
+    Flag = "Food_TeleportHeight",
+    Callback = function(v)
+        FoodControl.TeleportHeight = v
+    end
+})
+
+FoodTab:CreateSlider({
     Name = "Transport Wait Time",
     Range = {0.5, 5},
     Increment = 0.5,
@@ -5346,6 +5284,18 @@ AnimalPeltsTab:CreateDropdown({
                 break
             end
         end
+    end
+})
+
+AnimalPeltsTab:CreateSlider({
+    Name = "Teleport Height",
+    Range = {0, 50},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 35,
+    Flag = "AnimalPelts_TeleportHeight",
+    Callback = function(v)
+        AnimalPeltsControl.TeleportHeight = v
     end
 })
 
@@ -5419,6 +5369,18 @@ HealingTab:CreateDropdown({
 })
 
 HealingTab:CreateSlider({
+    Name = "Teleport Height",
+    Range = {0, 50},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 35,
+    Flag = "Healing_TeleportHeight",
+    Callback = function(v)
+        HealingControl.TeleportHeight = v
+    end
+})
+
+HealingTab:CreateSlider({
     Name = "Transport Wait Time",
     Range = {0.5, 5},
     Increment = 0.5,
@@ -5468,6 +5430,18 @@ AmmoTab:CreateToggle({
             AmmoControl.TeleportedItems = {}
             AmmoControl.SavedPlayerPosition = nil
         end
+    end
+})
+
+AmmoTab:CreateSlider({
+    Name = "Teleport Height",
+    Range = {0, 50},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 35,
+    Flag = "Ammo_TeleportHeight",
+    Callback = function(v)
+        AmmoControl.TeleportHeight = v
     end
 })
 
@@ -5938,19 +5912,30 @@ local function createSaplingsGUI()
     end
     
     local function clearHighlights() 
+        -- Clear tracked highlights
         for _, part in ipairs(highlightParts) do 
-            part:Destroy() 
+            if part and part.Parent then
+                part:Destroy() 
+            end
         end
         highlightParts = {} 
+        
+        -- Also clear any remaining PlantingHighlight parts in workspace (safety measure)
+        for _, part in pairs(workspace:GetChildren()) do
+            if part.Name == "PlantingHighlight" then
+                part:Destroy()
+            end
+        end
     end
     
     local function clearShape() 
         clearHighlights()
         shapePoints = {}
+        isPlanting = false  -- Also stop any ongoing planting
         if guiElements.ProgressLabel then 
             guiElements.ProgressLabel.Text = "Progress: N/A" 
         end
-        print("Shape cleared.") 
+        print("Shape cleared completely.") 
     end
     
     local function createHighlight(position, index) 
@@ -5965,7 +5950,9 @@ local function createSaplingsGUI()
         highlight.Transparency = 0.6
         highlight.CFrame = CFrame.new(position)
         highlight.Parent = workspace
-        highlightParts[index] = highlight 
+        
+        -- Add to highlights array for proper tracking
+        table.insert(highlightParts, highlight)
     end
     
     local function previewShape(forceUpdate)
@@ -5978,9 +5965,19 @@ local function createSaplingsGUI()
         end
         
         -- Clear highlights in these cases:
-        -- 1. Force update (from sliders/dropdown) - always clear for single shape
-        -- 2. No planting in progress AND no planted points (safe to clear)
-        if forceUpdate or (not isPlanting and plantedCount == 0) then
+        -- 1. Force update (from sliders/dropdown) - always clear highlights but preserve planted points data
+        -- 2. No planting in progress AND no planted points (safe to clear everything)
+        if forceUpdate then
+            -- For force updates (slider/dropdown changes), always clear highlights
+            clearHighlights()
+            if plantedCount == 0 then
+                -- If no planting progress, clear everything
+                shapePoints = {}
+            else
+                -- If there's planting progress, preserve shapePoints but clear highlights
+                print("Force update: cleared highlights, preserving", plantedCount, "planted points")
+            end
+        elseif not isPlanting and plantedCount == 0 then
             clearShape()
         elseif isPlanting or plantedCount > 0 then
             print("Preview skipped - planting in progress or has progress:", plantedCount, "/", #shapePoints)
@@ -6029,6 +6026,12 @@ local function createSaplingsGUI()
         rayParams.FilterType = Enum.RaycastFilterType.Whitelist
         rayParams.FilterDescendantsInstances = {groundPart}
         
+        -- If we didn't clear shapePoints (preserving planted progress), rebuild from scratch
+        if forceUpdate and #shapePoints > 0 then
+            -- Clear shapePoints and rebuild completely for force updates
+            shapePoints = {}
+        end
+        
         for i, point in ipairs(pointsToCalculate) do
             local result = workspace:Raycast(point, Vector3.new(0, -100, 0), rayParams)
             if result and result.Instance then
@@ -6068,7 +6071,7 @@ local function createSaplingsGUI()
         button.Text = text
         button.TextColor3 = textColor
         button.Font = Enum.Font.GothamBold
-        button.TextSize = 14
+        button.TextSize = 10
         button.Parent = parent
         button.Active = true  -- Ensure button is active for click detection
         button.AutoButtonColor = false  -- We'll handle color changes manually
@@ -6120,18 +6123,18 @@ local function createSaplingsGUI()
     screenGui.ResetOnSpawn = false
     
     -- Main container with shadow effect (Mobile-optimized size)
-    local shadowFrame = createRoundedFrame(screenGui, UDim2.new(0, 260, 0, 380), UDim2.new(0, 15, 0.5, -190), Color3.fromRGB(0, 0, 0), 12)
+    local shadowFrame = createRoundedFrame(screenGui, UDim2.new(0, 180, 0, 250), UDim2.new(0, 15, 0.5, -125), Color3.fromRGB(0, 0, 0), 12)
     shadowFrame.BackgroundTransparency = 0.7
     
-    local mainFrame = createRoundedFrame(screenGui, UDim2.new(0, 250, 0, 370), UDim2.new(0, 10, 0.5, -185), THEME.COLORS.BACKGROUND, 12)
+    local mainFrame = createRoundedFrame(screenGui, UDim2.new(0, 170, 0, 240), UDim2.new(0, 10, 0.5, -120), THEME.COLORS.BACKGROUND, 12)
     
     -- Minimize state variables
     local isMinimized = false
     local originalSize = mainFrame.Size
-    local minimizedSize = UDim2.new(0, 250, 0, 50)
+    local minimizedSize = UDim2.new(0, 170, 0, 40)
     
     -- Header with gradient and dragging functionality
-    local headerFrame = createRoundedFrame(mainFrame, UDim2.new(1, -20, 0, 50), UDim2.new(0, 10, 0, 10), THEME.COLORS.PRIMARY, 8)
+    local headerFrame = createRoundedFrame(mainFrame, UDim2.new(1, -20, 0, 35), UDim2.new(0, 10, 0, 8), THEME.COLORS.PRIMARY, 8)
     local headerGradient = Instance.new("UIGradient")
     headerGradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, THEME.COLORS.PRIMARY),
@@ -6140,21 +6143,22 @@ local function createSaplingsGUI()
     headerGradient.Rotation = 45
     headerGradient.Parent = headerFrame
     
-    local titleLabel = createLabel(headerFrame, UDim2.new(1, -80, 1, 0), UDim2.new(0, 20, 0, 0), "🌱 Sapling Planter", THEME.COLORS.TEXT, 18, Enum.Font.GothamBold)
+    local titleLabel = createLabel(headerFrame, UDim2.new(1, -60, 1, 0), UDim2.new(0, 15, 0, 0), "🌱 Sapling Planter", THEME.COLORS.TEXT, 14, Enum.Font.GothamBold)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     
     -- Minimize button
-    local minimizeBtn = createButton(headerFrame, UDim2.new(0, 30, 0, 30), UDim2.new(1, -40, 0, 10), "–", THEME.COLORS.SECONDARY, THEME.COLORS.TEXT, nil)
-    minimizeBtn.TextSize = 20
+    local minimizeBtn = createButton(headerFrame, UDim2.new(0, 22, 0, 22), UDim2.new(1, -28, 0, 6), "–", THEME.COLORS.SECONDARY, THEME.COLORS.TEXT, nil)
+    minimizeBtn.TextSize = 16
     minimizeBtn.Font = Enum.Font.GothamBold
     
-    -- Dragging functionality
+    -- Dragging functionality (Mobile and PC compatible)
     local isDragging = false
     local dragStart = nil
     local startPos = nil
     
     headerFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
             isDragging = true
             dragStart = input.Position
             startPos = mainFrame.Position
@@ -6162,7 +6166,8 @@ local function createSaplingsGUI()
     end)
     
     UserInputService.InputChanged:Connect(function(input)
-        if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
+                          input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             shadowFrame.Position = UDim2.new(mainFrame.Position.X.Scale, mainFrame.Position.X.Offset + 5, mainFrame.Position.Y.Scale, mainFrame.Position.Y.Offset + 5)
@@ -6170,20 +6175,21 @@ local function createSaplingsGUI()
     end)
     
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
             isDragging = false
         end
     end)
     
     -- Content frame (will be hidden/shown when minimizing)
-    local contentFrame = createRoundedFrame(mainFrame, UDim2.new(1, 0, 1, -50), UDim2.new(0, 0, 0, 50), Color3.fromRGB(0, 0, 0), 0)
+    local contentFrame = createRoundedFrame(mainFrame, UDim2.new(1, 0, 1, -35), UDim2.new(0, 0, 0, 35), Color3.fromRGB(0, 0, 0), 0)
     contentFrame.BackgroundTransparency = 1
     
     -- Minimize functionality
     minimizeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         local targetSize = isMinimized and minimizedSize or originalSize
-        local targetShadowSize = isMinimized and UDim2.new(0, 260, 0, 60) or UDim2.new(0, 260, 0, 380)
+        local targetShadowSize = isMinimized and UDim2.new(0, 180, 0, 50) or UDim2.new(0, 180, 0, 250)
         
         minimizeBtn.Text = isMinimized and "+" or "–"
         contentFrame.Visible = not isMinimized
@@ -6196,11 +6202,11 @@ local function createSaplingsGUI()
     end)
     
     -- Shape selection section
-    local shapeSection = createRoundedFrame(contentFrame, UDim2.new(1, -20, 0, 45), UDim2.new(0, 10, 0, 15), THEME.COLORS.SURFACE, 6)
-    local shapeSectionLabel = createLabel(shapeSection, UDim2.new(1, -15, 0, 20), UDim2.new(0, 15, 0, 5), "Shape Configuration", THEME.COLORS.TEXT_SECONDARY, 12, Enum.Font.GothamMedium)
+    local shapeSection = createRoundedFrame(contentFrame, UDim2.new(1, -20, 0, 32), UDim2.new(0, 10, 0, 10), THEME.COLORS.SURFACE, 6)
+    local shapeSectionLabel = createLabel(shapeSection, UDim2.new(1, -15, 0, 14), UDim2.new(0, 12, 0, 2), "Shape Configuration", THEME.COLORS.TEXT_SECONDARY, 9, Enum.Font.GothamMedium)
     
-    local shapeDropdown = createRoundedFrame(shapeSection, UDim2.new(1, -30, 0, 25), UDim2.new(0, 15, 0, 20), THEME.COLORS.SECONDARY, 4)
-    local shapeLabel = createLabel(shapeDropdown, UDim2.new(1, -30, 1, 0), UDim2.new(0, 10, 0, 0), "Shape: " .. currentShape, THEME.COLORS.TEXT, 13)
+    local shapeDropdown = createRoundedFrame(shapeSection, UDim2.new(1, -24, 0, 18), UDim2.new(0, 12, 0, 14), THEME.COLORS.SECONDARY, 4)
+    local shapeLabel = createLabel(shapeDropdown, UDim2.new(1, -25, 1, 0), UDim2.new(0, 8, 0, 0), "Shape: " .. currentShape, THEME.COLORS.TEXT, 10)
     
     local shapeBtn = Instance.new("TextButton")
     shapeBtn.Size = UDim2.new(1, 0, 1, 0)
@@ -6208,18 +6214,18 @@ local function createSaplingsGUI()
     shapeBtn.Text = ""
     shapeBtn.Parent = shapeDropdown
     
-    local dropdownIcon = createLabel(shapeDropdown, UDim2.new(0, 20, 1, 0), UDim2.new(1, -25, 0, 0), "▼", THEME.COLORS.TEXT_SECONDARY, 10)
+    local dropdownIcon = createLabel(shapeDropdown, UDim2.new(0, 15, 1, 0), UDim2.new(1, -18, 0, 0), "▼", THEME.COLORS.TEXT_SECONDARY, 8)
     dropdownIcon.TextXAlignment = Enum.TextXAlignment.Center
     
     -- Create dropdown at screen level with higher ZIndex to fix overlap issue (Mobile-optimized)
-    local shapeOptionsFrame = createRoundedFrame(screenGui, UDim2.new(0, 220, 0, 90), UDim2.new(0, 25, 0, 200), THEME.COLORS.SECONDARY, 4)
+    local shapeOptionsFrame = createRoundedFrame(screenGui, UDim2.new(0, 150, 0, 65), UDim2.new(0, 25, 0, 200), THEME.COLORS.SECONDARY, 4)
     shapeOptionsFrame.Visible = false
     shapeOptionsFrame.ClipsDescendants = true
     shapeOptionsFrame.ZIndex = 12  -- High z-index for dropdown container
     shapeOptionsFrame.Active = true  -- Make frame active to capture clicks
     
     local listLayout = Instance.new("UIListLayout")
-    listLayout.Padding = UDim.new(0, 2)
+    listLayout.Padding = UDim.new(0, 1)
     listLayout.Parent = shapeOptionsFrame
     
     shapeBtn.MouseButton1Click:Connect(function() 
@@ -6234,24 +6240,31 @@ local function createSaplingsGUI()
         end
     end)
     
-    -- Hide dropdown when clicking elsewhere (improved version)
+    -- Hide dropdown when clicking elsewhere (Mobile and PC compatible)
     local hideDropdownConnection
     hideDropdownConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
-            local mousePos = UserInputService:GetMouseLocation()
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or 
+            input.UserInputType == Enum.UserInputType.Touch) and not gameProcessed then
+            local inputPos
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                inputPos = UserInputService:GetMouseLocation()
+            else
+                inputPos = input.Position
+            end
+            
             local framePos = shapeOptionsFrame.AbsolutePosition
             local frameSize = shapeOptionsFrame.AbsoluteSize
             
             if shapeOptionsFrame.Visible then
                 -- Check if click was inside the dropdown options
-                local clickedInDropdown = (mousePos.X >= framePos.X and mousePos.X <= framePos.X + frameSize.X and
-                                         mousePos.Y >= framePos.Y and mousePos.Y <= framePos.Y + frameSize.Y)
+                local clickedInDropdown = (inputPos.X >= framePos.X and inputPos.X <= framePos.X + frameSize.X and
+                                         inputPos.Y >= framePos.Y and inputPos.Y <= framePos.Y + frameSize.Y)
                 
                 -- Check if click was on the dropdown button
                 local buttonPos = shapeDropdown.AbsolutePosition
                 local buttonSize = shapeDropdown.AbsoluteSize
-                local clickedOnButton = (mousePos.X >= buttonPos.X and mousePos.X <= buttonPos.X + buttonSize.X and
-                                       mousePos.Y >= buttonPos.Y and mousePos.Y <= buttonPos.Y + buttonSize.Y)
+                local clickedOnButton = (inputPos.X >= buttonPos.X and inputPos.X <= buttonPos.X + buttonSize.X and
+                                       inputPos.Y >= buttonPos.Y and inputPos.Y <= buttonPos.Y + buttonSize.Y)
                 
                 -- Only hide if clicked outside both dropdown and button
                 if not clickedInDropdown and not clickedOnButton then
@@ -6263,7 +6276,7 @@ local function createSaplingsGUI()
     end)
     
     for i, shapeName in ipairs(CONFIG.SHAPES) do
-        local optionBtn = createButton(shapeOptionsFrame, UDim2.new(1, -10, 0, 25), UDim2.new(0, 5, 0, (i-1) * 27), shapeName, THEME.COLORS.BACKGROUND, THEME.COLORS.TEXT, function()
+        local optionBtn = createButton(shapeOptionsFrame, UDim2.new(1, -8, 0, 18), UDim2.new(0, 4, 0, (i-1) * 19), shapeName, THEME.COLORS.BACKGROUND, THEME.COLORS.TEXT, function()
             print("Shape selected:", shapeName, "Current shape was:", currentShape)
             currentShape = shapeName
             shapeLabel.Text = "Shape: " .. currentShape
@@ -6273,7 +6286,7 @@ local function createSaplingsGUI()
             previewShape(true)  -- Force update for shape changes
         end)
         optionBtn.Font = Enum.Font.Gotham
-        optionBtn.TextSize = 12
+        optionBtn.TextSize = 9
         optionBtn.ZIndex = 15  -- Higher z-index for better click detection
         
         -- Add explicit active area to ensure clicks are detected
@@ -6292,18 +6305,18 @@ local function createSaplingsGUI()
     
     -- Enhanced slider creation function (Mobile-optimized)
     local function createEnhancedSlider(parent, text, yPos, min, max, default, suffix)
-        local sliderFrame = createRoundedFrame(parent, UDim2.new(1, -20, 0, 50), UDim2.new(0, 10, 0, yPos), THEME.COLORS.SURFACE, 6)
+        local sliderFrame = createRoundedFrame(parent, UDim2.new(1, -20, 0, 36), UDim2.new(0, 10, 0, yPos), THEME.COLORS.SURFACE, 6)
         
-        local label = createLabel(sliderFrame, UDim2.new(1, -15, 0, 16), UDim2.new(0, 10, 0, 3), text, THEME.COLORS.TEXT_SECONDARY, 11, Enum.Font.GothamMedium)
-        local valueLabel = createLabel(sliderFrame, UDim2.new(0, 70, 0, 16), UDim2.new(1, -80, 0, 3), default .. (suffix or ""), THEME.COLORS.TEXT, 11, Enum.Font.GothamBold)
+        local label = createLabel(sliderFrame, UDim2.new(1, -15, 0, 12), UDim2.new(0, 8, 0, 2), text, THEME.COLORS.TEXT_SECONDARY, 9, Enum.Font.GothamMedium)
+        local valueLabel = createLabel(sliderFrame, UDim2.new(0, 50, 0, 12), UDim2.new(1, -58, 0, 2), default .. (suffix or ""), THEME.COLORS.TEXT, 9, Enum.Font.GothamBold)
         valueLabel.TextXAlignment = Enum.TextXAlignment.Right
         
-        local track = createRoundedFrame(sliderFrame, UDim2.new(1, -20, 0, 6), UDim2.new(0, 10, 0, 28), THEME.COLORS.BACKGROUND, 3)
+        local track = createRoundedFrame(sliderFrame, UDim2.new(1, -16, 0, 5), UDim2.new(0, 8, 0, 20), THEME.COLORS.BACKGROUND, 3)
         local progress = createRoundedFrame(track, UDim2.new((default - min) / (max - min), 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.COLORS.PRIMARY, 3)
         
         local handle = Instance.new("TextButton")
-        handle.Size = UDim2.new(0, 16, 0, 16)
-        handle.Position = UDim2.new((default - min) / (max - min), -8, 0.5, -8)
+        handle.Size = UDim2.new(0, 12, 0, 12)
+        handle.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
         handle.BackgroundColor3 = THEME.COLORS.TEXT
         handle.BorderSizePixel = 0
         handle.Text = ""
@@ -6315,27 +6328,90 @@ local function createSaplingsGUI()
         
         local isSliderDragging = false
         
-        handle.MouseButton1Down:Connect(function() 
+        -- Handle both mouse and touch input for mobile compatibility
+        local function startDragging()
             isSliderDragging = true 
             handle.BackgroundColor3 = THEME.COLORS.PRIMARY
+        end
+        
+        local function stopDragging()
+            isSliderDragging = false
+            handle.BackgroundColor3 = THEME.COLORS.TEXT
+        end
+        
+        -- Mouse events (PC)
+        handle.MouseButton1Down:Connect(startDragging)
+        
+        -- Touch events (Mobile)
+        handle.TouchTap:Connect(startDragging)
+        
+        -- Allow clicking on track to move slider (Mobile-friendly)
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or
+               input.UserInputType == Enum.UserInputType.Touch then
+                local trackWidth = track.AbsoluteSize.X
+                local trackX = track.AbsolutePosition.X
+                local clickX = input.Position.X
+                local handleX = math.clamp(clickX - trackX, 0, trackWidth)
+                
+                local percentage = handleX / trackWidth
+                handle.Position = UDim2.new(percentage, -6, 0.5, -6)
+                progress.Size = UDim2.new(percentage, 0, 1, 0)
+                
+                local value = min + (max - min) * percentage
+                if suffix == " studs" then
+                    value = math.floor(value)
+                    valueLabel.Text = value .. suffix
+                    if text == "Dimension" then
+                        currentSize = value
+                    elseif text == "Spacing" then
+                        currentSpacing = value
+                    end
+                else
+                    value = math.floor(value * 10) / 10
+                    valueLabel.Text = string.format("%.1f", value) .. suffix
+                    currentHeightOffset = value
+                end
+                
+                -- Trigger preview update
+                if previewDebounceThread then
+                    task.cancel(previewDebounceThread)
+                end
+                previewDebounceThread = task.delay(DEBOUNCE_TIME, function()
+                    previewShape(true)
+                end)
+                
+                startDragging()
+            end
         end)
         
+        -- Universal input end detection
         UserInputService.InputEnded:Connect(function(input) 
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then 
-                isSliderDragging = false
-                handle.BackgroundColor3 = THEME.COLORS.TEXT
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+               input.UserInputType == Enum.UserInputType.Touch then 
+                stopDragging()
             end 
         end)
         
-        local function updateValue(input)
+        local updateValue = function(input)
             if not isSliderDragging then return end
             local trackWidth = track.AbsoluteSize.X
-            local mouseX = input.Position.X
             local trackX = track.AbsolutePosition.X
-            local handleX = math.clamp(mouseX - trackX, 0, trackWidth)
+            
+            -- Handle both mouse and touch input
+            local inputX
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                inputX = input.Position.X
+            elseif input.UserInputType == Enum.UserInputType.Touch then
+                inputX = input.Position.X
+            else
+                return
+            end
+            
+            local handleX = math.clamp(inputX - trackX, 0, trackWidth)
             
             local percentage = handleX / trackWidth
-            handle.Position = UDim2.new(percentage, -8, 0.5, -8)
+            handle.Position = UDim2.new(percentage, -6, 0.5, -6)
             progress.Size = UDim2.new(percentage, 0, 1, 0)
             
             local value = min + (max - min) * percentage
@@ -6346,13 +6422,14 @@ local function createSaplingsGUI()
     end
     
     -- Create enhanced sliders (Mobile-optimized spacing)
-    local updateSize = createEnhancedSlider(contentFrame, "Dimension", 65, CONFIG.MIN_SIZE, CONFIG.MAX_SIZE, CONFIG.DEFAULT_SIZE, " studs")
-    local updateSpacing = createEnhancedSlider(contentFrame, "Spacing", 125, CONFIG.MIN_SPACING, CONFIG.MAX_SPACING, CONFIG.DEFAULT_SPACING, " studs") 
-    local updateHeight = createEnhancedSlider(contentFrame, "Height Offset", 185, CONFIG.MIN_HEIGHT_OFFSET, CONFIG.MAX_HEIGHT_OFFSET, CONFIG.DEFAULT_HEIGHT_OFFSET, " units")
+    local updateSize = createEnhancedSlider(contentFrame, "Dimension", 47, CONFIG.MIN_SIZE, CONFIG.MAX_SIZE, CONFIG.DEFAULT_SIZE, " studs")
+    local updateSpacing = createEnhancedSlider(contentFrame, "Spacing", 87, CONFIG.MIN_SPACING, CONFIG.MAX_SPACING, CONFIG.DEFAULT_SPACING, " studs") 
+    local updateHeight = createEnhancedSlider(contentFrame, "Height Offset", 127, CONFIG.MIN_HEIGHT_OFFSET, CONFIG.MAX_HEIGHT_OFFSET, CONFIG.DEFAULT_HEIGHT_OFFSET, " units")
     
-    -- Handle slider updates
+    -- Handle slider updates (Support both mouse and touch)
     UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or 
+           input.UserInputType == Enum.UserInputType.Touch then
             local valueChanged = false
             
             local newSize, sizeLabel, sizeSuffix = updateSize(input)
@@ -6388,20 +6465,20 @@ local function createSaplingsGUI()
     end)
     
     -- Action buttons section (Mobile-optimized)
-    local buttonSection = createRoundedFrame(contentFrame, UDim2.new(1, -20, 0, 70), UDim2.new(0, 10, 0, 245), THEME.COLORS.SURFACE, 6)
+    local buttonSection = createRoundedFrame(contentFrame, UDim2.new(1, -20, 0, 50), UDim2.new(0, 10, 0, 167), THEME.COLORS.SURFACE, 6)
     
-    local previewBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 28), UDim2.new(0, 10, 0, 8), "🔍 Preview", THEME.COLORS.PRIMARY, THEME.COLORS.TEXT, previewShape)
-    local clearBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 28), UDim2.new(0.52, 0, 0, 8), "🗑️ Clear", THEME.COLORS.DANGER, THEME.COLORS.TEXT, clearShape)
+    local previewBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 20), UDim2.new(0, 8, 0, 5), "🔍 Preview", THEME.COLORS.PRIMARY, THEME.COLORS.TEXT, previewShape)
+    local clearBtn = createButton(buttonSection, UDim2.new(0.48, 0, 0, 20), UDim2.new(0.52, 0, 0, 5), "🗑️ Clear", THEME.COLORS.DANGER, THEME.COLORS.TEXT, clearShape)
     
     -- Progress display (Mobile-optimized)
-    local progressFrame = createRoundedFrame(buttonSection, UDim2.new(1, -20, 0, 22), UDim2.new(0, 10, 0, 42), THEME.COLORS.BACKGROUND, 4)
-    local progressLabel = createLabel(progressFrame, UDim2.new(1, -15, 1, 0), UDim2.new(0, 15, 0, 0), "Progress: N/A", THEME.COLORS.TEXT, 12, Enum.Font.GothamMedium)
+    local progressFrame = createRoundedFrame(buttonSection, UDim2.new(1, -16, 0, 16), UDim2.new(0, 8, 0, 29), THEME.COLORS.BACKGROUND, 4)
+    local progressLabel = createLabel(progressFrame, UDim2.new(1, -12, 1, 0), UDim2.new(0, 12, 0, 0), "Progress: N/A", THEME.COLORS.TEXT, 9, Enum.Font.GothamMedium)
     progressLabel.TextXAlignment = Enum.TextXAlignment.Center
     guiElements.ProgressLabel = progressLabel
     
     -- Plant/Stop buttons (Mobile-optimized)
-    local plantBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 30), UDim2.new(0, 10, 0, 325), "🌱 Start Planting", THEME.COLORS.SUCCESS, THEME.COLORS.TEXT, nil)
-    local stopBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 30), UDim2.new(0, 10, 0, 325), "⏹️ Stop Planting", THEME.COLORS.WARNING, THEME.COLORS.TEXT, nil)
+    local plantBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 22), UDim2.new(0, 10, 0, 221), "🌱 Start Planting", THEME.COLORS.SUCCESS, THEME.COLORS.TEXT, nil)
+    local stopBtn = createButton(contentFrame, UDim2.new(1, -20, 0, 22), UDim2.new(0, 10, 0, 221), "⏹️ Stop Planting", THEME.COLORS.WARNING, THEME.COLORS.TEXT, nil)
     stopBtn.Visible = false
     
     local function setButtons(canPlant) 
@@ -6469,15 +6546,18 @@ local function createSaplingsGUI()
                     end
                     
                     local saplingToPlant = table.remove(availableSaplings, 1)
-                    local originalPos = rootPart.CFrame
-                    rootPart.CFrame = saplingToPlant:GetPivot() * CFrame.new(0, 3, 3)
-                    task.wait(0.2)
+                    
+                    -- Teleport sapling directly to the destination position (exactly on the dot)
+                    local saplingPart = saplingToPlant.PrimaryPart or saplingToPlant:FindFirstChildOfClass("BasePart")
+                    if saplingPart then
+                        saplingPart.CFrame = CFrame.new(pointData.position)
+                        saplingPart.AssemblyLinearVelocity = Vector3.zero
+                        saplingPart.AssemblyAngularVelocity = Vector3.zero
+                    end
                     
                     local success, result = pcall(function() 
                         return plantRemote:InvokeServer(saplingToPlant, pointData.position) 
                     end)
-                    
-                    rootPart.CFrame = originalPos
                     
                     if success and result then
                         print("Planted sapling #"..i)
@@ -6495,7 +6575,8 @@ local function createSaplingsGUI()
                         table.insert(availableSaplings, 1, saplingToPlant)
                     end
                     
-                    task.wait(0.5)
+                    -- Wait 0.2 seconds between each planting
+
                 end
             end
             
