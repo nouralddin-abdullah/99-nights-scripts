@@ -4883,6 +4883,60 @@ MiscTab:CreateToggle({
     end
 })
 
+-- Instant Open Chests Section
+local InstantChestsControl = {
+    IsActive = false,
+    WorkspaceConnection = nil
+}
+
+local function patchChestPrompt(prompt)
+    if prompt:IsA("ProximityPrompt") and prompt.Name == "ProximityInteraction" then
+        local ancestor = prompt:FindFirstAncestorWhichIsA("Model")
+        if ancestor and string.find(ancestor.Name, "Chest") then
+            if prompt.HoldDuration > 0 then
+                prompt.HoldDuration = 0
+            end
+        end
+    end
+end
+
+local function activateInstantChests()
+    if InstantChestsControl.IsActive then
+        return
+    end
+    
+    InstantChestsControl.IsActive = true
+    
+    -- Patch existing chest prompts
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        patchChestPrompt(descendant)
+    end
+    
+    -- Watch for new chest prompts
+    InstantChestsControl.WorkspaceConnection = workspace.DescendantAdded:Connect(patchChestPrompt)
+end
+
+local function deactivateInstantChests()
+    if InstantChestsControl.WorkspaceConnection then
+        InstantChestsControl.WorkspaceConnection:Disconnect()
+        InstantChestsControl.WorkspaceConnection = nil
+    end
+    InstantChestsControl.IsActive = false
+end
+
+MiscTab:CreateToggle({
+    Name = "Instant Open Chests",
+    CurrentValue = false,
+    Flag = "Misc_InstantOpenChests",
+    Callback = function(v)
+        if v then
+            activateInstantChests()
+        else
+            deactivateInstantChests()
+        end
+    end
+})
+
 -- Reveal All Map Section
 MiscTab:CreateLabel("🗺️ Map Revealing - Please make sure to max the campfire first, it would be much better")
 
