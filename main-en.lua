@@ -4635,6 +4635,155 @@ end
 -- Initialize lighting system
 initializeLighting()
 
+-- Reveal All Map Control
+local RevealMapControl = {
+    IsRevealing = false,
+    TeleportCooldown = 1,
+    VisitedPositions = {},
+    GrassParts = {},
+    RevealThread = nil,
+    LastGrassCount = 0
+}
+
+local function roundPosition(position, precision)
+    precision = precision or 1
+    return Vector3.new(
+        math.floor(position.X / precision + 0.5) * precision,
+        math.floor(position.Y / precision + 0.5) * precision,
+        math.floor(position.Z / precision + 0.5) * precision
+    )
+end
+
+local function positionToString(position)
+    local rounded = roundPosition(position, 5) -- Round to nearest 5 studs for position matching
+    return string.format("%.0f,%.0f,%.0f", rounded.X, rounded.Y, rounded.Z)
+end
+
+local function isPositionVisited(position)
+    local posKey = positionToString(position)
+    return RevealMapControl.VisitedPositions[posKey] ~= nil
+end
+
+local function markPositionVisited(position)
+    local posKey = positionToString(position)
+    RevealMapControl.VisitedPositions[posKey] = true
+end
+
+local function refreshGrassParts()
+    local newGrassParts = {}
+    local groundFolder = workspace.Map and workspace.Map.Ground
+    if groundFolder then
+        for _, part in pairs(groundFolder:GetChildren()) do
+            if part.Name == "Grass" and part:IsA("BasePart") then
+                if not isPositionVisited(part.Position) then
+                    table.insert(newGrassParts, part)
+                end
+            end
+        end
+    end
+    
+    local newCount = #newGrassParts
+    local hasNewParts = newCount > RevealMapControl.LastGrassCount
+    RevealMapControl.LastGrassCount = newCount
+    RevealMapControl.GrassParts = newGrassParts
+    
+    return hasNewParts
+end
+
+local function teleportToGrassPart(grassPart)
+    local player = game.Players.LocalPlayer
+    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and grassPart then
+        -- Check if this position was already visited (double-check)
+        if isPositionVisited(grassPart.Position) then
+            return false
+        end
+        
+        local position = grassPart.Position + Vector3.new(0, 35, 0) -- Teleport 35 studs above the grass
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(position)
+        
+        -- Mark this position as visited
+        markPositionVisited(grassPart.Position)
+
+        return true
+    end
+    return false
+end
+
+local function startRevealingMap()
+    if RevealMapControl.IsRevealing then
+        return
+    end
+    
+    -- Don't reset visited positions - keep memory of previously visited places
+    -- RevealMapControl.VisitedPositions = {} -- REMOVED - this was causing revisits
+    RevealMapControl.LastGrassCount = 0
+    
+    refreshGrassParts()
+    
+    if #RevealMapControl.GrassParts == 0 then
+        return
+    end
+    
+    RevealMapControl.IsRevealing = true
+    
+    RevealMapControl.RevealThread = task.spawn(function()
+        while RevealMapControl.IsRevealing do
+            -- Refresh grass parts to check for newly loaded areas
+            local hasNewParts = refreshGrassParts()
+            
+            if #RevealMapControl.GrassParts == 0 then
+                -- No more unvisited grass parts, we're done
+                break
+            end
+            
+            -- Get the next unvisited grass part
+            local grassPart = RevealMapControl.GrassParts[1]
+            
+            if grassPart and teleportToGrassPart(grassPart) then
+                -- Successfully teleported, wait for cooldown
+                task.wait(RevealMapControl.TeleportCooldown)
+                
+                -- After teleporting, wait a bit more for potential new areas to load
+                task.wait(0.1)
+            else
+                -- If teleportation failed, refresh the list and try again
+                task.wait(0.1)
+            end
+        end
+        
+        if RevealMapControl.IsRevealing then
+            RevealMapControl.IsRevealing = false
+            -- Auto-turn off the toggle when completed
+            if ApocLibrary and ApocLibrary.Flags and ApocLibrary.Flags["Misc_RevealAllMap"] then
+                ApocLibrary.Flags["Misc_RevealAllMap"]:Set(false)
+            end
+        end
+    end)
+end
+
+local function teleportToCampfire()
+    local player = game.Players.LocalPlayer
+    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local campfire = workspace.Map and workspace.Map.Campground and workspace.Map.Campground.MainFire
+        if campfire and campfire:FindFirstChild("Center") then
+            local campfirePosition = campfire.Center.Position
+            local teleportPosition = campfirePosition + Vector3.new(0, 5, 0)
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(teleportPosition)
+        end
+    end
+end
+
+local function stopRevealingMap()
+    if RevealMapControl.RevealThread then
+        task.cancel(RevealMapControl.RevealThread)
+        RevealMapControl.RevealThread = nil
+    end
+    RevealMapControl.IsRevealing = false
+    
+    -- Teleport to campfire when stopping
+    teleportToCampfire()
+end
+
 -- Misc GUI Controls
 MiscTab:CreateLabel("After turning it off make sure to visit the campfire to restart the real time lighting")
 
@@ -4644,6 +4793,136 @@ MiscTab:CreateToggle({
     Flag = "Misc_AlwaysDayLight",
     Callback = function(v)
         toggleAlwaysDay(v)
+    end
+})
+
+-- Performance Booster Section
+MiscTab:CreateLabel("⚡ Performance Booster - Please note: Once you activate it, to disable you have to restart the game/server")
+
+-- Performance Booster Control
+local PerformanceBoosterControl = {
+    IsActive = false,
+    WorkspaceConnection = nil
+}
+
+local function optimizeObject(v)
+    pcall(function()
+        if not v or not v.Parent then return end
+        
+        if v:IsA("BasePart") then
+            v.Material = "Plastic"
+            v.Reflectance = 0
+        elseif v:IsA("Decal") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Lifetime = NumberRange.new(0)
+        elseif v:IsA("Explosion") then
+            v.BlastPressure = 1
+            v.BlastRadius = 1
+        end
+    end)
+end
+
+local function applyGlobalSettings()
+    -- Terrain Settings
+    local terrain = workspace:FindFirstChildOfClass('Terrain')
+    if terrain then
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 0
+    end
+
+    -- Lighting Settings (avoid conflict with Always Day Light)
+    if not (ApocLibrary and ApocLibrary.Flags and ApocLibrary.Flags["Misc_AlwaysDayLight"] and ApocLibrary.Flags["Misc_AlwaysDayLight"].CurrentValue) then
+        game:GetService("Lighting").GlobalShadows = false
+    end
+    game:GetService("Lighting").FogEnd = 9e9
+
+    -- Graphics Quality Settings
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    end)
+
+    -- Post-Processing Effects
+    for i,v in pairs(game:GetService("Lighting"):GetDescendants()) do
+        if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+            v.Enabled = false
+        end
+    end
+end
+
+local function activatePerformanceBooster()
+    if PerformanceBoosterControl.IsActive then
+        return
+    end
+    
+    PerformanceBoosterControl.IsActive = true
+    
+    -- Apply global settings
+    applyGlobalSettings()
+    
+    -- Optimize existing objects
+    for i, v in pairs(workspace:GetDescendants()) do
+        optimizeObject(v)
+    end
+    
+    -- Connect to optimize new objects
+    PerformanceBoosterControl.WorkspaceConnection = workspace.DescendantAdded:Connect(optimizeObject)
+end
+
+MiscTab:CreateToggle({
+    Name = "Performance Booster",
+    CurrentValue = false,
+    Flag = "Misc_PerformanceBooster",
+    Callback = function(v)
+        if v then
+            activatePerformanceBooster()
+        end
+        -- Note: Cannot be disabled once activated as per requirement
+    end
+})
+
+-- Reveal All Map Section
+MiscTab:CreateLabel("🗺️ Map Revealing - Please make sure to max the campfire first, it would be much better")
+
+MiscTab:CreateSlider({
+    Name = "Teleport Cooldown",
+    Range = {0, 5},
+    Increment = 0.1,
+    Suffix = " sec",
+    CurrentValue = RevealMapControl.TeleportCooldown,
+    Flag = "Misc_TeleportCooldown",
+    Callback = function(val)
+        RevealMapControl.TeleportCooldown = val
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Reveal All Map",
+    CurrentValue = false,
+    Flag = "Misc_RevealAllMap",
+    Callback = function(v)
+        if v then
+            startRevealingMap()
+        else
+            stopRevealingMap()
+        end
+    end
+})
+
+MiscTab:CreateButton({
+    Name = "Clear Visited Positions",
+    Callback = function()
+        RevealMapControl.VisitedPositions = {}
+        RevealMapControl.LastGrassCount = 0
+        -- Also turn off the toggle if it's running
+        if RevealMapControl.IsRevealing then
+            stopRevealingMap()
+            if ApocLibrary and ApocLibrary.Flags and ApocLibrary.Flags["Misc_RevealAllMap"] then
+                ApocLibrary.Flags["Misc_RevealAllMap"]:Set(false)
+            end
+        end
     end
 })
 
