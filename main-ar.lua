@@ -1,26 +1,26 @@
 --[[
-    99 Night At Forest - Player Module (Initial Phase)
-    This script currently ONLY initializes the UI and adds core player attribute controls.
-    Scope (as requested):
-      - GUI initialization with a single "Player" tab/section
-      - Controls for player character attributes:
-          * Speed (WalkSpeed)
-          * Jump (JumpPower)
-          * Noclip (disables collisions on the local character parts)
-    No extra features beyond those listed are added in this phase.
+    99 Night At Forest - وحدة اللاعب (المرحلة الأولى)
+    هذا الاسكربت يقوم فقط بتهيئة واجهة المستخدم وإضافة عناصر تحكم أساسية لخصائص اللاعب.
+    النطاق (كما هو مطلوب):
+      - تهيئة واجهة المستخدم مع تبويب واحد "اللاعب"
+      - عناصر تحكم لخصائص شخصية اللاعب:
+          * السرعة (WalkSpeed)
+          * القفز (JumpPower)
+          * الطيران (يلغي التصادمات على أجزاء الشخصية المحلية)
+    لا توجد ميزات إضافية غير المذكورة في هذه المرحلة.
 ]]
 
--- Load external UI library
+-- تحميل مكتبة واجهة المستخدم الخارجية
 local ApocLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/nouralddin-abdullah/Apoc/refs/heads/main/toasty.lua"))()
 
--- Services / core references
+-- الخدمات / المراجع الأساسية
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
--- Camera control state
+-- حالة التحكم في الكاميرا
 local CameraControl = {
     OriginalCameraType = nil,
     OriginalCFrame = nil,
@@ -28,19 +28,19 @@ local CameraControl = {
     IsFrozen = false
 }
 
--- Global teleportation state control
+-- التحكم العام في حالة النقل الفوري
 local TeleportationControl = {
     IsBusy = false,
     CurrentItem = nil,
     StartTime = 0
 }
 
--- Create main window
+-- إنشاء النافذة الرئيسية
 local Window = ApocLibrary:CreateWindow({
-    Name = "ToastyXD Hub",
-    Icon = 4483362458, -- Placeholder asset id (update if you have a custom icon)
-    LoadingTitle = "99 Night Interface",
-    LoadingSubtitle = "Loading script...",
+    Name = "مركز ToastyXD",
+    Icon = 4483362458, -- معرف أصل مؤقت (قم بالتحديث إذا كان لديك أيقونة مخصصة)
+    LoadingTitle = "واجهة 99 ليلة",
+    LoadingSubtitle = "جاري تحميل الاسكربت...",
     ShowText = "99NF",
     Theme = "Default",
     ToggleUIKeybind = 'K',
@@ -51,175 +51,198 @@ local Window = ApocLibrary:CreateWindow({
     KeySystem = false
 })
 
--- Create Info tab (Important Information)
-InfoTab = Window:CreateTab("Information", 4483362458)
-InfoSection = InfoTab:CreateSection("Important Information")
+-- إنشاء تبويب المعلومات (معلومات مهمة)
+InfoTab = Window:CreateTab("المعلومات", 4483362458)
+InfoSection = InfoTab:CreateSection("معلومات مهمة")
 
--- Create Misc tab
-MiscTab = Window:CreateTab("Misc", 4483362458)
-MiscSection = MiscTab:CreateSection("Miscellaneous")
+-- إنشاء تبويب متنوع
+MiscTab = Window:CreateTab("متنوع", 4483362458)
+MiscSection = MiscTab:CreateSection("أدوات متنوعة")
 
--- Single Player tab & section (as requested)
-PlayerTab = Window:CreateTab("Player", 4483362458)
-PlayerSection = PlayerTab:CreateSection("Player Settings")
+-- تبويب اللاعب (كما هو مطلوب)
+PlayerTab = Window:CreateTab("اللاعب", 4483362458)
+PlayerSection = PlayerTab:CreateSection("إعدادات اللاعب")
 
--- Create Combat tab
-CombatTab = Window:CreateTab("Combat", 4483362458)
-CombatSection = CombatTab:CreateSection("Auto Attack")
+-- إنشاء تبويب القتال
+CombatTab = Window:CreateTab("القتال", 4483362458)
+CombatSection = CombatTab:CreateSection("الهجوم التلقائي")
 
--- Create Trees tab
-TreesTab = Window:CreateTab("Trees", 4483362458)
-TreesSection = TreesTab:CreateSection("Tree Cutting")
+-- إنشاء تبويب الأشجار
+TreesTab = Window:CreateTab("الأشجار", 4483362458)
+TreesSection = TreesTab:CreateSection("قطع الأشجار")
 
--- Create Campfire tab
-CampfireTab = Window:CreateTab("Campfire", 4483362458)
-CampfireSection = CampfireTab:CreateSection("Auto Refill")
+-- إنشاء تبويب نار المخيم
+CampfireTab = Window:CreateTab("نار المخيم", 4483362458)
+CampfireSection = CampfireTab:CreateSection("إعادة التعبئة التلقائية")
 
--- Create Crafting tab
-CraftingTab = Window:CreateTab("Crafting", 4483362458)
-CraftingSection = CraftingTab:CreateSection("Scrapper Machine")
+-- إنشاء تبويب التصنيع
+CraftingTab = Window:CreateTab("التصنيع", 4483362458)
+CraftingSection = CraftingTab:CreateSection("آلة التخريد")
 
--- Create Food tab
-FoodTab = Window:CreateTab("Food", 4483362458)
-FoodSection = FoodTab:CreateSection("Food Transport")
+-- إنشاء تبويب الطعام
+FoodTab = Window:CreateTab("الطعام", 4483362458)
+FoodSection = FoodTab:CreateSection("نقل الطعام")
 
--- Create Animal Pelts tab
-AnimalPeltsTab = Window:CreateTab("Animal Pelts", 4483362458)
-AnimalPeltsSection = AnimalPeltsTab:CreateSection("Animal Pelts Transport")
+-- إنشاء تبويب جلود الحيوانات
+AnimalPeltsTab = Window:CreateTab("جلود الحيوانات", 4483362458)
+AnimalPeltsSection = AnimalPeltsTab:CreateSection("نقل جلود الحيوانات")
 
--- Create Healing tab
-HealingTab = Window:CreateTab("Healing", 4483362458)
-HealingSection = HealingTab:CreateSection("Healing Items Transport")
+-- إنشاء تبويب العلاج
+HealingTab = Window:CreateTab("العلاج", 4483362458)
+HealingSection = HealingTab:CreateSection("نقل أدوات العلاج")
 
--- Create Ammo tab
-AmmoTab = Window:CreateTab("Ammo", 4483362458)
-AmmoSection = AmmoTab:CreateSection("Ammo Transport")
+-- إنشاء تبويب الذخيرة
+AmmoTab = Window:CreateTab("الذخيرة", 4483362458)
+AmmoSection = AmmoTab:CreateSection("نقل الذخيرة")
 
--- Create Chests tab
-ChestsTab = Window:CreateTab("Chests", 4483362458)
-ChestsSection = ChestsTab:CreateSection("Chest Finder")
+-- إنشاء تبويب الصناديق
+ChestsTab = Window:CreateTab("الصناديق", 4483362458)
+ChestsSection = ChestsTab:CreateSection("باحث الصناديق")
 
--- Create ESP tab
-ESPTab = Window:CreateTab("ESP", 4483362458)
-ESPSection = ESPTab:CreateSection("Visual ESP")
+-- إنشاء تبويب الرؤية المحسنة
+ESPTab = Window:CreateTab("الرؤية المحسنة", 4483362458)
+ESPSection = ESPTab:CreateSection("الرؤية البصرية")
 
--- Create Skybase tab
-SkybaseTab = Window:CreateTab("Skybase", 4483362458)
-SkybaseSection = SkybaseTab:CreateSection("Auto Survival")
+-- إنشاء تبويب القاعدة الجوية
+SkybaseTab = Window:CreateTab("القاعدة الجوية", 4483362458)
+SkybaseSection = SkybaseTab:CreateSection("البقاء التلقائي")
 
--- Create Lost Children tab
-LostChildrenTab = Window:CreateTab("Lost Children", 4483362458)
-LostChildrenSection = LostChildrenTab:CreateSection("Child Rescue")
+-- إنشاء تبويب الأطفال المفقودين
+LostChildrenTab = Window:CreateTab("الأطفال المفقودين", 4483362458)
+LostChildrenSection = LostChildrenTab:CreateSection("إنقاذ الأطفال")
 
-GUITap = Window:CreateTab("GUIS", 4483362458)
-GUISection = GUITap:CreateSection("Independant GUI's Section")
+GUITap = Window:CreateTab("الواجهات", 4483362458)
+GUISection = GUITap:CreateSection("قسم الواجهات المستقلة")
 
--- Create Credits tab
-CreditsTab = Window:CreateTab("Credits", 4483362458)
-CreditsSection = CreditsTab:CreateSection("About Developer & Support")
+-- إنشاء تبويب الائتمانات
+CreditsTab = Window:CreateTab("الائتمانات", 4483362458)
+CreditsSection = CreditsTab:CreateSection("حول المطور والدعم")
 
 
--- English Translation Mappings for Display Names
+-- خريطة الترجمة العربية لأسماء العرض
 DisplayTranslations = {
-    -- Tree Types
-    ["Every tree"] = "Every Tree",
-    ["Small Tree"] = "Small Tree",
-    ["Snowy Small Tree"] = "Snowy Small Tree",
-    ["TreeBig1"] = "Large Tree Type 1",
-    ["TreeBig2"] = "Large Tree Type 2", 
-    ["TreeBig3"] = "Large Tree Type 3",
+    -- أنواع الأشجار
+    ["Every tree"] = "كل الأشجار",
+    ["Small Tree"] = "شجرة صغيرة",
+    ["Snowy Small Tree"] = "شجرة صغيرة ثلجية",
+    ["TreeBig1"] = "شجرة كبيرة نوع 1",
+    ["TreeBig2"] = "شجرة كبيرة نوع 2", 
+    ["TreeBig3"] = "شجرة كبيرة نوع 3",
     
-    -- Refill Items
-    ["All"] = "All Items",
-    ["Log"] = "Log",
-    ["Coal"] = "Coal",
-    ["Biofuel"] = "Biofuel",
-    ["Fuel Canister"] = "Fuel Canister",
-    ["Oil Barrel"] = "Oil Barrel",
+    -- عناصر إعادة التعبئة
+    ["All"] = "كل العناصر",
+    ["Log"] = "خشب",
+    ["Coal"] = "فحم",
+    ["Biofuel"] = "وقود حيوي",
+    ["Fuel Canister"] = "خزان وقود",
+    ["Oil Barrel"] = "برميل زيت",
 
-    -- Scrap Items
-    ["Bolt"] = "Bolt",
-    ["Sheet Metal"] = "Sheet Metal",
-    ["Broken Fan"] = "Broken Fan",
-    ["Old Radio"] = "Old Radio",
-    ["Broken Microwave"] = "Broken Microwave",
-    ["Tyre"] = "Tire",
-    ["Metal Chair"] = "Metal Chair",
-    ["Old Car Engine"] = "Old Car Engine",
-    ["Washing Machine"] = "Washing Machine",
-    ["Cultist Experiment"] = "Cultist Experiment",
-    ["Cultist Prototype"] = "Cultist Prototype",
-    ["UFO Scrap"] = "UFO Scrap",
+    -- عناصر الخردة
+    ["Bolt"] = "مسمار",
+    ["Sheet Metal"] = "صفيحة معدنية",
+    ["Broken Fan"] = "مروحة مكسورة",
+    ["Old Radio"] = "راديو قديم",
+    ["Broken Microwave"] = "ميكروويف مكسور",
+    ["Tyre"] = "إطار",
+    ["Metal Chair"] = "كرسي معدني",
+    ["Old Car Engine"] = "محرك سيارة قديم",
+    ["Washing Machine"] = "غسالة",
+    ["Cultist Experiment"] = "تجربة طائفية",
+    ["Cultist Prototype"] = "نموذج طائفي",
+    ["UFO Scrap"] = "خردة طبق طائر",
     
-    -- Cultist Gem
-    ["Cultist Gem"] = "Cultist Gem",
+    -- جوهرة الطائفة
+    ["Cultist Gem"] = "جوهرة الطائفة",
     
-    -- Food Items
-    ["All Food"] = "All Food",
-    ["Cake"] = "Cake",
-    ["Ribs"] = "Ribs",
-    ["Steak"] = "Steak",
-    ["Morsel"] = "Morsel",
-    ["Carrot"] = "Carrot",
-    ["Corn"] = "Corn",
-    ["Pumpkin"] = "Pumpkin",
-    ["Berry"] = "Berry",
-    ["Apple"] = "Apple",
-    ["Chili"] = "Chili",
+    -- عناصر الطعام
+    ["All Food"] = "كل الطعام",
+    ["Cake"] = "كيك",
+    ["Ribs"] = "أضلاع",
+    ["Steak"] = "ستيك",
+    ["Morsel"] = "قطعة لحم",
+    ["Carrot"] = "جزر",
+    ["Corn"] = "ذرة",
+    ["Pumpkin"] = "يقطين",
+    ["Berry"] = "توت",
+    ["Apple"] = "تفاح",
+    ["Chili"] = "فلفل حار",
     
-    -- Animal Pelts
-    ["Bunny Foot"] = "Bunny Foot",
-    ["Wolf Pelt"] = "Wolf Pelt",
-    ["Alpha Wolf Pelt"] = "Alpha Wolf Pelt",
-    ["Bear Pelt"] = "Bear Pelt",
-    ["Arctic Fox Pelt"] = "Arctic Fox Pelt",
-    ["Polar Bear Pelt"] = "Polar Bear Pelt",
-    ["Mammoth Tusk"] = "Mammoth Tusk",
+    -- جلود الحيوانات
+    ["Bunny Foot"] = "قدم أرنب",
+    ["Wolf Pelt"] = "جلد ذئب",
+    ["Alpha Wolf Pelt"] = "جلد ذئب ألفا",
+    ["Bear Pelt"] = "جلد دب",
+    ["Arctic Fox Pelt"] = "جلد ثعلب قطبي",
+    ["Polar Bear Pelt"] = "جلد دب قطبي",
+    ["Mammoth Tusk"] = "ناب الماموث",
     
-    -- Healing Items
-    ["All Healing"] = "All Healing Items",
-    ["Bandage"] = "Bandage",
-    ["Medkit"] = "Medical Kit",
+    -- عناصر العلاج
+    ["All Healing"] = "كل أدوات العلاج",
+    ["Bandage"] = "ضمادة",
+    ["Medkit"] = "حقيبة طبية",
     
-    -- Ammo Items
-    ["All Ammo"] = "All Ammo Types",
-    ["Revolver Ammo"] = "Revolver Ammo",
-    ["Rifle Ammo"] = "Rifle Ammo",
-    ["Shotgun Ammo"] = "Shotgun Ammo",
+    -- عناصر الذخيرة
+    ["All Ammo"] = "كل أنواع الذخيرة",
+    ["Revolver Ammo"] = "ذخيرة مسدس",
+    ["Rifle Ammo"] = "ذخيرة بندقية",
+    ["Shotgun Ammo"] = "ذخيرة بندقية رش",
     
-    -- Entities
-    ["Cultist"] = "Cultist",
-    ["Crossbow Cultist"] = "Crossbow Cultist",
-    ["Juggernaut Cultist"] = "Juggernaut Cultist",
-    ["Wolf"] = "Wolf",
-    ["Alpha Wolf"] = "Alpha Wolf",
-    ["Bear"] = "Bear",
-    ["Polar Bear"] = "Polar Bear",
-    ["The Deer"] = "The Deer",
-    ["Alien"] = "Alien",
-    ["Alien Elite"] = "Alien Elite",
-    ["Arctic Fox"] = "Arctic Fox",
-    ["Mammoth"] = "Mammoth",
-    ["Bunny"] = "Bunny",
+    -- الكائنات
+    ["Cultist"] = "طائفي",
+    ["Crossbow Cultist"] = "طائفي بالنشاب",
+    ["Juggernaut Cultist"] = "طائفي مدرع",
+    ["Wolf"] = "ذئب",
+    ["Alpha Wolf"] = "ذئب ألفا",
+    ["Bear"] = "دب",
+    ["Polar Bear"] = "دب قطبي",
+    ["The Deer"] = "الغزال",
+    ["Alien"] = "كائن فضائي",
+    ["Alien Elite"] = "كائن فضائي نخبة",
+    ["Arctic Fox"] = "ثعلب قطبي",
+    ["Mammoth"] = "ماموث",
+    ["Bunny"] = "أرنب",
     
-    -- Destinations
-    ["Player"] = "Player",
-    ["Campfire"] = "Campfire", 
-    ["Scrapper"] = "Scrapper",
-    ["Sack"] = "Sack",
+    -- الوجهات
+    ["Player"] = "اللاعب",
+    ["Campfire"] = "نار المخيم", 
+    ["Scrapper"] = "آلة التخريد",
+    ["Sack"] = "الكيس",
     
-    -- General Terms
-    ["Enable"] = "Enable",
-    ["Disable"] = "Disable",
-    ["None"] = "None"
+    -- مصطلحات عامة
+    ["Enable"] = "تفعيل",
+    ["Disable"] = "إلغاء",
+    ["None"] = "لا شيء",
+    
+    -- أنواع الأسلحة
+    ["General Axe"] = "فأس عام",
+    ["Spear"] = "رمح", 
+    ["Morningstar"] = "نجمة الصباح",
+    ["Ice Sword"] = "سيف الثلج",
+    ["Infernal Sword"] = "سيف الجحيم",
+    ["Laser Sword"] = "سيف الليزر",
+    ["Poison Spear"] = "رمح سام",
+    ["Trident"] = "الشوكة ثلاثية",
+    ["Katana"] = "كاتانا",
+    
+    -- أنواع الصناديق
+    ["Item Chest"] = "صندوق عادي",
+    ["Item Chest2"] = "صندوق عادي 2",
+    ["Item Chest3"] = "صندوق عادي 3", 
+    ["Item Chest4"] = "صندوق عادي 4",
+    ["Item Chest5"] = "صندوق عادي 5",
+    ["Item Chest6"] = "صندوق عادي 6",
+    ["Volcanic Chest1"] = "صندوق بركاني 1",
+    ["Volcanic Chest2"] = "صندوق بركاني 2",
+    ["Snow Chest1"] = "صندوق ثلجي 1",
+    ["Snow Chest2"] = "صندوق ثلجي 2"
 }
 
--- Function to get English display translation or return original if not found
+-- دالة للحصول على الترجمة العربية أو إرجاع النص الأصلي إذا لم توجد الترجمة
 local function GetDisplayText(englishText)
     return DisplayTranslations[englishText] or englishText
 end
 
--- Function to create translated dropdown options
+-- دالة لإنشاء خيارات القائمة المنسدلة المترجمة
 local function CreateTranslatedOptions(englishArray)
     local translatedArray = {}
     for i, englishItem in ipairs(englishArray) do
@@ -228,10 +251,10 @@ local function CreateTranslatedOptions(englishArray)
     return translatedArray
 end
 
--- Player attribute control state
+-- حالة التحكم في خصائص اللاعب
 local PlayerControl = {
     SpeedEnabled = false,
-    SpeedValue = 32, -- default WalkSpeed override
+    SpeedValue = 32, -- قيمة سرعة المشي الافتراضية
     JumpEnabled = false,
     JumpValue = 50,  -- default JumpPower override
     FlyEnabled = false, -- replaces previous Noclip
@@ -332,6 +355,12 @@ local WeaponTypes = {
     "Trident",
     "Katana"
 }
+
+-- إنشاء قائمة مترجمة للأسلحة للواجهة
+local TranslatedWeaponTypes = {}
+for _, weapon in ipairs(WeaponTypes) do
+    table.insert(TranslatedWeaponTypes, DisplayTranslations[weapon] or weapon)
+end
 
 -- Trees control state
 local TreesControl = {
@@ -4265,7 +4294,7 @@ RunService.Heartbeat:Connect(function()
                 LostChildrenToggle:Set(false)
             end
             if LostChildrenStatus then
-                LostChildrenStatus.Text = "Status: All children collected! ✅"
+                LostChildrenStatus.Text = "الحالة: تم جمع جميع الأطفال! ✅"
             end
         else
             -- Still need to collect more children
@@ -4274,40 +4303,40 @@ RunService.Heartbeat:Connect(function()
         
         -- Update GUI status (only if GUI elements exist)
         if LostChildrenStatus then
-            local statusText = "Status: "
+            local statusText = "الحالة: "
             if LostChildrenControl.CurrentStep == "searching" then
-                statusText = statusText .. "Searching for children... (" .. rescued .. "/" .. total .. ")"
+                statusText = statusText .. "البحث عن الأطفال... (" .. rescued .. "/" .. total .. ")"
             elseif LostChildrenControl.CurrentStep == "rescuing" then
-                statusText = statusText .. "Rescuing child... (" .. rescued .. "/" .. total .. ")"
+                statusText = statusText .. "إنقاذ طفل... (" .. rescued .. "/" .. total .. ")"
             elseif LostChildrenControl.CurrentStep == "returning" then
-                statusText = statusText .. "Returning to original location..."
+                statusText = statusText .. "العودة إلى الموقع الأصلي..."
             else
-                statusText = statusText .. "Active (" .. rescued .. "/" .. total .. ")"
+                statusText = statusText .. "نشط (" .. rescued .. "/" .. total .. ")"
             end
             LostChildrenStatus.Text = statusText
         end
     else
         if LostChildrenStatus then
-            LostChildrenStatus.Text = "Status: Inactive"
+            LostChildrenStatus.Text = "الحالة: غير نشط"
         end
     end
 end)
 
 -- Info Section Content
-InfoTab:CreateLabel("📖 Please read before using:")
-InfoTab:CreateLabel("🔥 Fire Setup:")
-InfoTab:CreateLabel("Make sure to upgrade your fire to maximum level.")
-InfoTab:CreateLabel("Items may glitch if you teleport them from unopened")
-InfoTab:CreateLabel("map areas to your location.")
-InfoTab:CreateLabel("🎯 Transport Options:")
-InfoTab:CreateLabel("Each transport feature has two destination options:")
-InfoTab:CreateLabel("• Player: Teleports items to your location")
-InfoTab:CreateLabel("• Campfire/Scrapper: Teleports to the specified station")
-InfoTab:CreateLabel("Choose the option that works best for you!")
-InfoTab:CreateLabel("🐛 Found issues or have ideas?")
-InfoTab:CreateLabel("Join the Discord community! You can find the link")
-InfoTab:CreateLabel("in the Credits section above.")
-InfoTab:CreateLabel("We welcome bug reports and feature suggestions!")
+InfoTab:CreateLabel("📖 يرجى القراءة قبل الاستخدام:")
+InfoTab:CreateLabel("🔥 إعداد النار:")
+InfoTab:CreateLabel("تأكد من ترقية نارك إلى أقصى مستوى.")
+InfoTab:CreateLabel("قد تتعطل العناصر إذا قمت بنقلها من مناطق خريطة")
+InfoTab:CreateLabel("غير مفتوحة إلى موقعك.")
+InfoTab:CreateLabel("🎯 خيارات النقل:")
+InfoTab:CreateLabel("كل ميزة نقل لها خيارين للوجهة:")
+InfoTab:CreateLabel("• اللاعب: ينقل العناصر إلى موقعك")
+InfoTab:CreateLabel("• نار المخيم/المجمع: ينقل إلى المحطة المحددة")
+InfoTab:CreateLabel("اختر الخيار الذي يناسبك أكثر!")
+InfoTab:CreateLabel("🐛 وجدت مشاكل أو لديك أفكار؟")
+InfoTab:CreateLabel("انضم إلى مجتمع الديسكورد! يمكنك العثور على الرابط")
+InfoTab:CreateLabel("في قسم الائتمانات أعلاه.")
+InfoTab:CreateLabel("نرحب بتقارير الأخطاء واقتراحات الميزات!")
 
 --============================================================================--
 --      [[ SKYBASE FUNCTIONS ]]
@@ -4439,7 +4468,7 @@ local function createSkybaseGui()
     titleText.Size = UDim2.new(1, -50, 1, 0)
     titleText.Position = UDim2.new(0, 15, 0, 0)
     titleText.BackgroundTransparency = 1
-    titleText.Text = "🏗️ Sky Base"
+    titleText.Text = "🏗️ قاعدة السماء"
     titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
     titleText.TextScaled = true
     titleText.Font = Enum.Font.SourceSansBold
@@ -4482,7 +4511,7 @@ local function createSkybaseGui()
     xInput.Position = UDim2.new(0, 10, 0, 80)
     xInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     xInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    xInput.PlaceholderText = "Width (X)"
+    xInput.PlaceholderText = "العرض (X)"
     xInput.Text = "4"
     xInput.Font = Enum.Font.SourceSans
     xInput.TextScaled = true
@@ -4499,7 +4528,7 @@ local function createSkybaseGui()
     yInput.Position = UDim2.new(0.6, 5, 0, 80)
     yInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     yInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    yInput.PlaceholderText = "Length (Y)"
+    yInput.PlaceholderText = "الطول (Y)"
     yInput.Text = "4"
     yInput.Font = Enum.Font.SourceSans
     yInput.TextScaled = true
@@ -4515,7 +4544,7 @@ local function createSkybaseGui()
     createButton.Size = UDim2.new(1, -20, 0, 40)
     createButton.Position = UDim2.new(0, 10, 0, 125)
     createButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-    createButton.Text = "🏗️ Create Platform"
+    createButton.Text = "🏗️ إنشاء منصة"
     createButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     createButton.TextScaled = true
     createButton.Font = Enum.Font.SourceSansBold
@@ -4531,7 +4560,7 @@ local function createSkybaseGui()
     moveLabel.Size = UDim2.new(1, -20, 0, 25)
     moveLabel.Position = UDim2.new(0, 10, 0, 175)
     moveLabel.BackgroundTransparency = 1
-    moveLabel.Text = "🎮 Movement Controls:"
+    moveLabel.Text = "🎮 أدوات التحكم في الحركة:"
     moveLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     moveLabel.TextScaled = true
     moveLabel.Font = Enum.Font.SourceSansBold
@@ -4559,16 +4588,16 @@ local function createSkybaseGui()
     end
 
     -- Movement button layout (organized grid)
-    local upBtn = createMoveButton("UpButton", "⬆️ Up", UDim2.new(0.5, -40, 0, 205), UDim2.new(0, 80, 0, 25), Color3.fromRGB(70, 130, 180))
-    local downBtn = createMoveButton("DownButton", "⬇️ Down", UDim2.new(0.5, -40, 0, 285), UDim2.new(0, 80, 0, 25), Color3.fromRGB(70, 130, 180))
+    local upBtn = createMoveButton("UpButton", "⬆️ أعلى", UDim2.new(0.5, -40, 0, 205), UDim2.new(0, 80, 0, 25), Color3.fromRGB(70, 130, 180))
+    local downBtn = createMoveButton("DownButton", "⬇️ أسفل", UDim2.new(0.5, -40, 0, 285), UDim2.new(0, 80, 0, 25), Color3.fromRGB(70, 130, 180))
     
     -- Left and Right buttons (middle row, left side)
-    local leftBtn = createMoveButton("LeftButton", "⬅️ Left", UDim2.new(0, 10, 0, 235), UDim2.new(0, 65, 0, 25), Color3.fromRGB(100, 100, 100))
-    local rightBtn = createMoveButton("RightButton", "➡️ Right", UDim2.new(0, 10, 0, 265), UDim2.new(0, 65, 0, 25), Color3.fromRGB(100, 100, 100))
+    local leftBtn = createMoveButton("LeftButton", "⬅️ يسار", UDim2.new(0, 10, 0, 235), UDim2.new(0, 65, 0, 25), Color3.fromRGB(100, 100, 100))
+    local rightBtn = createMoveButton("RightButton", "➡️ يمين", UDim2.new(0, 10, 0, 265), UDim2.new(0, 65, 0, 25), Color3.fromRGB(100, 100, 100))
     
     -- Forward and Back buttons (middle row, right side)
-    local fwdBtn = createMoveButton("ForwardButton", "🔼 Forward", UDim2.new(1, -75, 0, 235), UDim2.new(0, 65, 0, 25), Color3.fromRGB(50, 150, 50))
-    local backBtn = createMoveButton("BackButton", "🔽 Back", UDim2.new(1, -75, 0, 265), UDim2.new(0, 65, 0, 25), Color3.fromRGB(150, 50, 50))
+    local fwdBtn = createMoveButton("ForwardButton", "🔼 أمام", UDim2.new(1, -75, 0, 235), UDim2.new(0, 65, 0, 25), Color3.fromRGB(50, 150, 50))
+    local backBtn = createMoveButton("BackButton", "🔽 خلف", UDim2.new(1, -75, 0, 265), UDim2.new(0, 65, 0, 25), Color3.fromRGB(150, 50, 50))
 
     -- Info Label
     local infoLabel = Instance.new("TextLabel")
@@ -4576,7 +4605,7 @@ local function createSkybaseGui()
     infoLabel.Size = UDim2.new(1, -20, 0, 30)
     infoLabel.Position = UDim2.new(0, 10, 0, 315)
     infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "💡 Tip: Drag the window from the top bar"
+    infoLabel.Text = "💡 نصيحة: اسحب النافذة من الشريط العلوي"
     infoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     infoLabel.TextScaled = true
     infoLabel.Font = Enum.Font.SourceSans
@@ -4588,10 +4617,10 @@ local function createSkybaseGui()
         createOrDeletePlatform()
         -- Update button text and color
         if SkybaseControl.PlatformModel then
-            createButton.Text = "🗑️ Delete Platform"
+            createButton.Text = "🗑️ حذف المنصة"
             createButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         else
-            createButton.Text = "🏗️ Create Platform"
+            createButton.Text = "🏗️ إنشاء منصة"
             createButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
         end
     end)
@@ -4793,11 +4822,11 @@ local function stopRevealingMap()
     teleportToCampfire()
 end
 
--- Misc GUI Controls
-MiscTab:CreateLabel("After turning it off make sure to visit the campfire to restart the real time lighting")
+-- أدوات التحكم في واجهة المتنوعات
+MiscTab:CreateLabel("بعد إيقاف تشغيله تأكد من زيارة نار المخيم لإعادة تشغيل الإضاءة الحقيقية")
 
 MiscTab:CreateToggle({
-    Name = "Always Day Light",
+    Name = "ضوء النهار دائماً",
     CurrentValue = false,
     Flag = "Misc_AlwaysDayLight",
     Callback = function(v)
@@ -4805,8 +4834,8 @@ MiscTab:CreateToggle({
     end
 })
 
--- Performance Booster Section
-MiscTab:CreateLabel("⚡ Performance Booster - Please note: Once you activate it, to disable you have to restart the game/server")
+-- قسم معزز الأداء
+MiscTab:CreateLabel("⚡ معزز الأداء - يرجى ملاحظة: بمجرد تفعيله، للتعطيل يجب إعادة تشغيل اللعبة/الخادم")
 
 -- Performance Booster Control
 local PerformanceBoosterControl = {
@@ -4881,7 +4910,7 @@ local function activatePerformanceBooster()
 end
 
 MiscTab:CreateToggle({
-    Name = "Performance Booster",
+    Name = "معزز الأداء",
     CurrentValue = false,
     Flag = "Misc_PerformanceBooster",
     Callback = function(v)
@@ -4892,7 +4921,7 @@ MiscTab:CreateToggle({
     end
 })
 
--- Instant Open Chests Section
+-- قسم فتح الصناديق الفوري
 local InstantChestsControl = {
     IsActive = false,
     WorkspaceConnection = nil
@@ -4934,7 +4963,7 @@ local function deactivateInstantChests()
 end
 
 MiscTab:CreateToggle({
-    Name = "Instant Open Chests",
+    Name = "فتح الصناديق فورياً",
     CurrentValue = false,
     Flag = "Misc_InstantOpenChests",
     Callback = function(v)
@@ -4946,14 +4975,14 @@ MiscTab:CreateToggle({
     end
 })
 
--- Reveal All Map Section
-MiscTab:CreateLabel("🗺️ Map Revealing - Please make sure to max the campfire first, it would be much better")
+-- قسم كشف كامل الخريطة
+MiscTab:CreateLabel("🗺️ كشف الخريطة - يرجى التأكد من تطوير نار المخيم إلى الحد الأقصى أولاً، سيكون أفضل بكثير")
 
 MiscTab:CreateSlider({
-    Name = "Teleport Cooldown",
+    Name = "فترة انتظار النقل",
     Range = {0, 5},
     Increment = 0.1,
-    Suffix = " sec",
+    Suffix = " ثانية",
     CurrentValue = RevealMapControl.TeleportCooldown,
     Flag = "Misc_TeleportCooldown",
     Callback = function(val)
@@ -4962,7 +4991,7 @@ MiscTab:CreateSlider({
 })
 
 MiscTab:CreateToggle({
-    Name = "Reveal All Map",
+    Name = "كشف كامل الخريطة",
     CurrentValue = false,
     Flag = "Misc_RevealAllMap",
     Callback = function(v)
@@ -4975,7 +5004,7 @@ MiscTab:CreateToggle({
 })
 
 MiscTab:CreateButton({
-    Name = "Clear Visited Positions",
+    Name = "مسح المواقع المزارة",
     Callback = function()
         RevealMapControl.VisitedPositions = {}
         RevealMapControl.LastGrassCount = 0
@@ -4989,9 +5018,9 @@ MiscTab:CreateButton({
     end
 })
 
--- Player GUI Controls
+-- عناصر التحكم في واجهة اللاعب
 PlayerTab:CreateToggle({
-    Name = "Enable Speed",
+    Name = "تفعيل السرعة",
     CurrentValue = false,
     Flag = "Player_EnableSpeed",
     Callback = function(v)
@@ -5001,10 +5030,10 @@ PlayerTab:CreateToggle({
 })
 
 PlayerTab:CreateSlider({
-    Name = "Speed Value",
+    Name = "قيمة السرعة",
     Range = {16, 100},
     Increment = 1,
-    Suffix = " speed",
+    Suffix = " سرعة",
     CurrentValue = PlayerControl.SpeedValue,
     Flag = "Player_SpeedValue",
     Callback = function(val)
@@ -5014,7 +5043,7 @@ PlayerTab:CreateSlider({
 })
 
 PlayerTab:CreateToggle({
-    Name = "Enable Jump",
+    Name = "تفعيل القفز",
     CurrentValue = false,
     Flag = "Player_EnableJump",
     Callback = function(v)
@@ -5024,10 +5053,10 @@ PlayerTab:CreateToggle({
 })
 
 PlayerTab:CreateSlider({
-    Name = "Jump Power",
+    Name = "قوة القفز",
     Range = {25, 150},
     Increment = 1,
-    Suffix = " jump",
+    Suffix = " قفز",
     CurrentValue = PlayerControl.JumpValue,
     Flag = "Player_JumpValue",
     Callback = function(val)
@@ -5037,13 +5066,13 @@ PlayerTab:CreateSlider({
 })
 
 PlayerTab:CreateToggle({
-    Name = "Fly Mode",
+    Name = "وضع الطيران",
     CurrentValue = false,
     Flag = "Player_FlyMode",
     Callback = function(v)
         PlayerControl.FlyEnabled = v
         if not v then
-            -- Reset velocity when disabling
+            -- إعادة تعيين السرعة عند الإلغاء
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 char.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
@@ -5053,10 +5082,10 @@ PlayerTab:CreateToggle({
 })
 
 PlayerTab:CreateSlider({
-    Name = "Fly Speed",
+    Name = "سرعة الطيران",
     Range = {10, 200},
     Increment = 1,
-    Suffix = " studs/s",
+    Suffix = " وحدة/ث",
     CurrentValue = PlayerControl.FlySpeed,
     Flag = "Player_FlySpeed",
     Callback = function(val)
@@ -5064,14 +5093,14 @@ PlayerTab:CreateSlider({
     end
 })
 
--- Important Places Teleportation
-PlayerTab:CreateLabel("🗺️ Important Places Teleportation:")
-PlayerTab:CreateLabel("If teleportation doesn't work, try revealing the map first as some locations may not be loaded yet.")
+-- النقل الفوري للأماكن المهمة
+PlayerTab:CreateLabel("🗺️ النقل الفوري للأماكن المهمة:")
+PlayerTab:CreateLabel("إذا لم يعمل النقل الفوري، جرب كشف الخريطة أولاً لأن بعض المواقع قد تكون غير محملة بعد.")
 
 PlayerTab:CreateDropdown({
-    Name = "Teleport to Important Places",
-    Options = {"Campfire", "Safe Place Underground", "Volcano Sacrifice", "Stronghold", "Fairy House", "Tool Workshop"},
-    CurrentOption = {"Campfire"},
+    Name = "النقل الفوري للأماكن المهمة",
+    Options = {"نار المخيم", "مكان آمن تحت الأرض", "تضحية البركان", "الحصن", "بيت الجنية", "ورشة الأدوات"},
+    CurrentOption = {"نار المخيم"},
     Flag = "Player_TeleportLocation",
     Callback = function(options)
         local player = game.Players.LocalPlayer
@@ -5083,21 +5112,21 @@ PlayerTab:CreateDropdown({
         local destination = nil
         local locationFound = false
         
-        if selectedLocation == "Campfire" then
+        if selectedLocation == "نار المخيم" then
             local campfire = workspace.Map and workspace.Map.Campground and workspace.Map.Campground.MainFire
             if campfire and campfire:FindFirstChild("Center") then
                 destination = campfire.Center.Position + Vector3.new(0, 5, 0)
                 locationFound = true
             end
             
-        elseif selectedLocation == "Safe Place Underground" then
+        elseif selectedLocation == "مكان آمن تحت الأرض" then
             local baseplate = workspace.Map and workspace.Map:FindFirstChild("Baseplate")
             if baseplate then
                 destination = baseplate.Position + Vector3.new(0, 3, 0)
                 locationFound = true
             end
             
-        elseif selectedLocation == "Volcano Sacrifice" then
+        elseif selectedLocation == "تضحية البركان" then
             local volcano = workspace.Map and workspace.Map.Landmarks and workspace.Map.Landmarks:FindFirstChild("Volcano")
             if volcano and volcano:FindFirstChild("Functional") and volcano.Functional:FindFirstChild("Sacrifice") 
                and volcano.Functional.Sacrifice:FindFirstChild("Fuse") and volcano.Functional.Sacrifice.Fuse:FindFirstChild("Wedge") then
@@ -5105,21 +5134,21 @@ PlayerTab:CreateDropdown({
                 locationFound = true
             end
             
-        elseif selectedLocation == "Stronghold" then
+        elseif selectedLocation == "الحصن" then
             local stronghold = workspace.Map and workspace.Map.Landmarks and workspace.Map.Landmarks:FindFirstChild("Stronghold")
             if stronghold and stronghold:FindFirstChild("Functional") and stronghold.Functional:FindFirstChild("Sign") then
                 destination = stronghold.Functional.Sign.Position + Vector3.new(0, 5, 0)
                 locationFound = true
             end
             
-        elseif selectedLocation == "Fairy House" then
+        elseif selectedLocation == "بيت الجنية" then
             local fairyHouse = workspace.Map and workspace.Map.Landmarks and workspace.Map.Landmarks:FindFirstChild("Fairy House")
             if fairyHouse and fairyHouse:FindFirstChild("Fairy") and fairyHouse.Fairy:FindFirstChild("HumanoidRootPart") then
                 destination = fairyHouse.Fairy.HumanoidRootPart.Position + Vector3.new(0, 5, 0)
                 locationFound = true
             end
             
-        elseif selectedLocation == "Tool Workshop" then
+        elseif selectedLocation == "ورشة الأدوات" then
             local toolWorkshop = workspace.Map and workspace.Map.Landmarks and workspace.Map.Landmarks:FindFirstChild("ToolWorkshop")
             if toolWorkshop and toolWorkshop:FindFirstChild("Main") then
                 destination = toolWorkshop.Main.Position + Vector3.new(0, 5, 0)
@@ -5131,8 +5160,8 @@ PlayerTab:CreateDropdown({
             player.Character.HumanoidRootPart.CFrame = CFrame.new(destination)
         else
             ApocLibrary:Notify({
-                Title = "Location Not Found",
-                Content = "The location '" .. selectedLocation .. "' has not loaded yet. Try revealing the map first!",
+                Title = "لم يتم العثور على الموقع",
+                Content = "الموقع '" .. selectedLocation .. "' لم يتم تحميله بعد. جرب كشف الخريطة أولاً!",
                 Duration = 6.5,
                 Image = 4483362458,
             })
@@ -5140,9 +5169,9 @@ PlayerTab:CreateDropdown({
     end
 })
 
--- Combat GUI Controls
+-- أدوات التحكم في واجهة القتال
 CombatTab:CreateToggle({
-    Name = "Enable Auto Attack",
+    Name = "تفعيل الهجوم التلقائي",
     CurrentValue = false,
     Flag = "Combat_KillAura",
     Callback = function(v)
@@ -5155,17 +5184,26 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateDropdown({
-    Name = "Weapon Type",
-    Options = WeaponTypes,
-    CurrentOption = {WeaponTypes[1]},
+    Name = "نوع السلاح",
+    Options = TranslatedWeaponTypes,
+    CurrentOption = {TranslatedWeaponTypes[1]},
     Flag = "Combat_WeaponType",
     Callback = function(options)
-        CombatControl.WeaponType = options[1]
+        -- البحث عن الاسم الإنجليزي الأصلي
+        local selectedTranslated = options[1]
+        local originalWeapon = nil
+        for english, arabic in pairs(DisplayTranslations) do
+            if arabic == selectedTranslated then
+                originalWeapon = english
+                break
+            end
+        end
+        CombatControl.WeaponType = originalWeapon or selectedTranslated
     end
 })
 
 CombatTab:CreateToggle({
-    Name = "Ultra Kill",
+    Name = "القتل الخارق",
     CurrentValue = false,
     Flag = "Combat_UltraKill",
     Callback = function(v)
@@ -5174,10 +5212,10 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateSlider({
-    Name = "Attack Range",
+    Name = "مدى الهجوم",
     Range = {5, 500}, -- Increased max range to 1000 as requested
     Increment = 10,
-    Suffix = " meters",
+    Suffix = " متر",
     CurrentValue = CombatControl.AuraRange,
     Flag = "Combat_AuraRange",
     Callback = function(val)
@@ -5185,11 +5223,11 @@ CombatTab:CreateSlider({
     end
 })
 
--- Firearm Options Section
-local FirearmSection = CombatTab:CreateSection("Firearm Options")
+-- قسم خيارات الأسلحة النارية
+local FirearmSection = CombatTab:CreateSection("خيارات الأسلحة النارية")
 
 CombatTab:CreateToggle({
-    Name = "Instant Reload",
+    Name = "إعادة تحميل فورية",
     CurrentValue = false,
     Flag = "Combat_InstantReload",
     Callback = function(v)
@@ -5203,10 +5241,10 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateSlider({
-    Name = "Reload Time",
+    Name = "وقت إعادة التحميل",
     Range = {0, 1.5},
     Increment = 0.1,
-    Suffix = " sec",
+    Suffix = " ثانية",
     CurrentValue = CombatControl.ReloadTime,
     Flag = "Combat_ReloadTime",
     Callback = function(val)
@@ -5218,7 +5256,7 @@ CombatTab:CreateSlider({
 })
 
 CombatTab:CreateToggle({
-    Name = "Firerate",
+    Name = "معدل إطلاق النار",
     CurrentValue = false,
     Flag = "Combat_FireRate",
     Callback = function(v)
@@ -5232,10 +5270,10 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateSlider({
-    Name = "Firerate Speed",
+    Name = "سرعة إطلاق النار",
     Range = {0.05, 0.5},
     Increment = 0.01,
-    Suffix = " sec",
+    Suffix = " ثانية",
     CurrentValue = CombatControl.FireRate,
     Flag = "Combat_FireRateSpeed",
     Callback = function(val)
@@ -5246,9 +5284,9 @@ CombatTab:CreateSlider({
     end
 })
 
--- Trees GUI Controls
+-- أدوات التحكم في واجهة الأشجار
 TreesTab:CreateToggle({
-    Name = "Enable Auto Tree Chopping",
+    Name = "تفعيل قطع الأشجار التلقائي",
     CurrentValue = false,
     Flag = "Trees_ChoppingAura",
     Callback = function(v)
@@ -5270,7 +5308,7 @@ TreesTab:CreateToggle({
 })
 
 TreesTab:CreateToggle({
-    Name = "Ultra Tree Chopping",
+    Name = "قطع الأشجار الخارق",
     CurrentValue = false,
     Flag = "Trees_UltraChopping",
     Callback = function(v)
@@ -5279,10 +5317,10 @@ TreesTab:CreateToggle({
 })
 
 TreesTab:CreateSlider({
-    Name = "Chopping Range",
+    Name = "مدى قطع الأشجار",
     Range = {5, 500},
     Increment = 10,
-    Suffix = " meters",
+    Suffix = " متر",
     CurrentValue = TreesControl.ChoppingRange,
     Flag = "Trees_ChoppingRange",
     Callback = function(val)
@@ -5291,7 +5329,7 @@ TreesTab:CreateSlider({
 })
 
 TreesTab:CreateDropdown({
-    Name = "Target Tree Type",
+    Name = "نوع الشجرة المستهدفة",
     Options = CreateTranslatedOptions(TreeTypes),
     CurrentOption = {GetDisplayText(TreeTypes[1])},
     Flag = "Trees_TargetType",
@@ -5308,10 +5346,10 @@ TreesTab:CreateDropdown({
 })
 
 TreesTab:CreateSlider({
-    Name = "Ultra Chop Tree Count",
+    Name = "عدد الأشجار للقطع الخارق",
     Range = {1, 20},
     Increment = 1,
-    Suffix = " trees",
+    Suffix = " شجرة",
     CurrentValue = TreesControl.UltraChopCount,
     Flag = "Trees_UltraCount",
     Callback = function(val)
@@ -5319,10 +5357,10 @@ TreesTab:CreateSlider({
     end
 })
 
--- Campfire GUI Controls
+-- أدوات التحكم في واجهة نار المخيم
 
 CampfireTab:CreateDropdown({
-    Name = "Transport To:",
+    Name = "النقل إلى:",
     Options = CreateTranslatedOptions(CampfireDestinations),
     CurrentOption = {GetDisplayText(CampfireDestinations[1])},
     Flag = "Campfire_Destination",
@@ -5339,10 +5377,10 @@ CampfireTab:CreateDropdown({
 })
 
 CampfireTab:CreateSlider({
-    Name = "Teleport Height",
+    Name = "ارتفاع النقل",
     Range = {0, 50},
     Increment = 1,
-    Suffix = " studs",
+    Suffix = " وحدة",
     CurrentValue = 35,
     Flag = "Campfire_TeleportHeight",
     Callback = function(v)
@@ -5351,7 +5389,7 @@ CampfireTab:CreateSlider({
 })
 
 CampfireTab:CreateToggle({
-    Name = "Smart Auto Refill (By %)",
+    Name = "إعادة التعبئة الذكية (حسب النسبة المئوية)",
     CurrentValue = false,
     Flag = "Campfire_AutoRefill",
     Callback = function(v)
@@ -5376,7 +5414,7 @@ CampfireTab:CreateToggle({
 })
 
 CampfireTab:CreateToggle({
-    Name = "Continuous Refill (Always)",
+    Name = "إعادة التعبئة المستمرة (دائماً)",
     CurrentValue = false,
     Flag = "Campfire_ContinuousRefill",
     Callback = function(v)
@@ -5399,10 +5437,10 @@ CampfireTab:CreateToggle({
 })
 
 CampfireTab:CreateSlider({
-    Name = "Refill Wait Time",
+    Name = "وقت انتظار إعادة التعبئة",
     Range = {0.5, 2},
     Increment = 0.1,
-    Suffix = " seconds",
+    Suffix = " ثانية",
     CurrentValue = CampfireControl.RefillCheckCooldown,
     Flag = "Campfire_RefillCooldown",
     Callback = function(val)
@@ -5411,7 +5449,7 @@ CampfireTab:CreateSlider({
 })
 
 CampfireTab:CreateSlider({
-    Name = "Refill Percentage",
+    Name = "نسبة إعادة التعبئة",
     Range = {5, 95},
     Increment = 5,
     Suffix = "%",
@@ -5423,7 +5461,7 @@ CampfireTab:CreateSlider({
 })
 
 CampfireTab:CreateDropdown({
-    Name = "Refill Item Type",
+    Name = "نوع عنصر إعادة التعبئة",
     Options = CreateTranslatedOptions(RefillItemTypes),
     CurrentOption = {GetDisplayText(RefillItemTypes[1])},
     Flag = "Campfire_RefillType",
@@ -5439,14 +5477,14 @@ CampfireTab:CreateDropdown({
     end
 })
 
-CampfireTab:CreateLabel("🚀 Uses advanced teleportation system")
-CampfireTab:CreateLabel("🎯 35 meters up, 5 meters back for perfect drop")
+CampfireTab:CreateLabel("🚀 يستخدم نظام نقل متقدم")
+CampfireTab:CreateLabel("🎯 35 متر لأعلى، 5 أمتار للخلف للإسقاط المثالي")
 
 
--- Crafting GUI Controls
+-- أدوات التحكم في واجهة الصناعة
 
 CraftingTab:CreateDropdown({
-    Name = "Transport To:",
+    Name = "النقل إلى:",
     Options = CreateTranslatedOptions(CraftingDestinations),
     CurrentOption = {GetDisplayText(CraftingDestinations[1])},
     Flag = "Crafting_Destination",
@@ -5463,10 +5501,10 @@ CraftingTab:CreateDropdown({
 })
 
 CraftingTab:CreateSlider({
-    Name = "Teleport Height",
+    Name = "ارتفاع النقل",
     Range = {0, 50},
     Increment = 1,
-    Suffix = " studs",
+    Suffix = " متر",
     CurrentValue = 35,
     Flag = "Crafting_TeleportHeight",
     Callback = function(v)
@@ -5475,13 +5513,13 @@ CraftingTab:CreateSlider({
 })
 
 CraftingTab:CreateParagraph({
-    Title = "💡 Tip:",
-    Content = "Use Transport To: Player if you encounter issues with the scrapper"
+    Title = "💡 نصيحة:",
+    Content = "استخدم النقل إلى: اللاعب إذا واجهت مشاكل مع المجمع"
 })
 
 
 CraftingTab:CreateToggle({
-    Name = "🔩 Produce Scrap",
+    Name = "🔩 إنتاج الخردة",
     CurrentValue = false,
     Flag = "Crafting_ProduceScrap",
     Callback = function(v)
@@ -5505,7 +5543,7 @@ CraftingTab:CreateToggle({
 })
 
 CraftingTab:CreateDropdown({
-    Name = "Scrap Item Type",
+    Name = "نوع عنصر الخردة",
     Options = ScrapItemTypes,
     CurrentOption = {ScrapItemTypes[1]},
     Flag = "Crafting_ScrapType",
@@ -5515,7 +5553,7 @@ CraftingTab:CreateDropdown({
 })
 
 CraftingTab:CreateToggle({
-    Name = "🪵 Produce Wood (⚠️ Use only one option)",
+    Name = "🪵 إنتاج الخشب (⚠️ استخدم خيار واحد فقط)",
     CurrentValue = false,
     Flag = "Crafting_ProduceWood",
     Callback = function(v)
@@ -5539,7 +5577,7 @@ CraftingTab:CreateToggle({
 })
 
 CraftingTab:CreateDropdown({
-    Name = "Wood Item Type",
+    Name = "نوع عنصر الخشب",
     Options = WoodItemTypes,
     CurrentOption = {WoodItemTypes[1]},
     Flag = "Crafting_WoodType",
@@ -5549,7 +5587,7 @@ CraftingTab:CreateDropdown({
 })
 
 CraftingTab:CreateToggle({
-    Name = "💎 Produce Cultist Gem (⚠️ Use only one option)",
+    Name = "💎 إنتاج جوهرة الطائفة (⚠️ استخدم خيار واحد فقط)",
     CurrentValue = false,
     Flag = "Crafting_ProduceCultistGem",
     Callback = function(v)
@@ -5573,7 +5611,7 @@ CraftingTab:CreateToggle({
 })
 
 CraftingTab:CreateDropdown({
-    Name = "Cultist Gem Item Type",
+    Name = "نوع عنصر جوهرة الطائفة",
     Options = CultistGemItemTypes,
     CurrentOption = {CultistGemItemTypes[1]},
     Flag = "Crafting_CultistGemType",
@@ -5584,9 +5622,9 @@ CraftingTab:CreateDropdown({
 
 
 
--- Food GUI Controls
+-- أدوات التحكم في واجهة الطعام
 FoodTab:CreateToggle({
-    Name = "Enable Food Transporter",
+    Name = "تفعيل ناقل الطعام",
     CurrentValue = false,
     Flag = "Food_TeleportEnabled",
     Callback = function(v)
@@ -5608,7 +5646,7 @@ FoodTab:CreateToggle({
 })
 
 FoodTab:CreateDropdown({
-    Name = "Transport To:",
+    Name = "النقل إلى:",
     Options = CreateTranslatedOptions(FoodDestinations),
     CurrentOption = {GetDisplayText(FoodDestinations[1])},
     Flag = "Food_Destination",
@@ -5625,10 +5663,10 @@ FoodTab:CreateDropdown({
 })
 
 FoodTab:CreateSlider({
-    Name = "Teleport Height",
+    Name = "ارتفاع النقل",
     Range = {0, 50},
     Increment = 1,
-    Suffix = " studs",
+    Suffix = " وحدة",
     CurrentValue = 35,
     Flag = "Food_TeleportHeight",
     Callback = function(v)
@@ -5637,10 +5675,10 @@ FoodTab:CreateSlider({
 })
 
 FoodTab:CreateSlider({
-    Name = "Transport Wait Time",
+    Name = "وقت انتظار النقل",
     Range = {0.5, 5},
     Increment = 0.5,
-    Suffix = " seconds",
+    Suffix = " ثانية",
     CurrentValue = FoodControl.TeleportCooldown,
     Flag = "Food_TeleportCooldown",
     Callback = function(val)
@@ -5649,7 +5687,7 @@ FoodTab:CreateSlider({
 })
 
 FoodTab:CreateDropdown({
-    Name = "Food Type",
+    Name = "نوع الطعام",
     Options = CreateTranslatedOptions(FoodItemTypes),
     CurrentOption = {GetDisplayText(FoodItemTypes[1])},
     Flag = "Food_ItemType",
@@ -5665,9 +5703,9 @@ FoodTab:CreateDropdown({
     end
 })
 
--- Animal Pelts GUI Controls
+-- أدوات التحكم في واجهة جلود الحيوانات
 AnimalPeltsTab:CreateToggle({
-    Name = "Enable Animal Pelts Transporter",
+    Name = "تفعيل ناقل جلود الحيوانات",
     CurrentValue = false,
     Flag = "AnimalPelts_TeleportEnabled",
     Callback = function(v)
@@ -5689,7 +5727,7 @@ AnimalPeltsTab:CreateToggle({
 })
 
 AnimalPeltsTab:CreateDropdown({
-    Name = "Transport To:",
+    Name = "النقل إلى:",
     Options = CreateTranslatedOptions(PeltDestinations),
     CurrentOption = {GetDisplayText(PeltDestinations[1])},
     Flag = "AnimalPelts_Destination",
@@ -5706,10 +5744,10 @@ AnimalPeltsTab:CreateDropdown({
 })
 
 AnimalPeltsTab:CreateSlider({
-    Name = "Teleport Height",
+    Name = "ارتفاع النقل",
     Range = {0, 50},
     Increment = 1,
-    Suffix = " studs",
+    Suffix = " وحدة",
     CurrentValue = 35,
     Flag = "AnimalPelts_TeleportHeight",
     Callback = function(v)
@@ -5718,10 +5756,10 @@ AnimalPeltsTab:CreateSlider({
 })
 
 AnimalPeltsTab:CreateSlider({
-    Name = "Transport Wait Time",
+    Name = "وقت انتظار النقل",
     Range = {0.5, 5},
     Increment = 0.5,
-    Suffix = " seconds",
+    Suffix = " ثانية",
     CurrentValue = AnimalPeltsControl.TeleportCooldown,
     Flag = "AnimalPelts_TeleportCooldown",
     Callback = function(val)
@@ -5730,7 +5768,7 @@ AnimalPeltsTab:CreateSlider({
 })
 
 AnimalPeltsTab:CreateDropdown({
-    Name = "Animal Pelt Type",
+    Name = "نوع جلد الحيوان",
     Options = CreateTranslatedOptions(AnimalPeltTypes),
     CurrentOption = {GetDisplayText(AnimalPeltTypes[1])},
     Flag = "AnimalPelts_ItemType",
@@ -5748,7 +5786,7 @@ AnimalPeltsTab:CreateDropdown({
 
 -- Healing GUI Controls
 HealingTab:CreateToggle({
-    Name = "Enable Healing Items Transporter",
+    Name = "تفعيل ناقل أدوات العلاج",
     CurrentValue = false,
     Flag = "Healing_TeleportEnabled",
     Callback = function(v)
@@ -5770,7 +5808,7 @@ HealingTab:CreateToggle({
 })
 
 HealingTab:CreateDropdown({
-    Name = "Transport To:",
+    Name = "النقل إلى:",
     Options = CreateTranslatedOptions(HealingDestinations),
     CurrentOption = {GetDisplayText(HealingDestinations[1])},
     Flag = "Healing_Destination",
@@ -5787,10 +5825,10 @@ HealingTab:CreateDropdown({
 })
 
 HealingTab:CreateSlider({
-    Name = "Teleport Height",
+    Name = "ارتفاع النقل",
     Range = {0, 50},
     Increment = 1,
-    Suffix = " studs",
+    Suffix = " وحدة",
     CurrentValue = 35,
     Flag = "Healing_TeleportHeight",
     Callback = function(v)
@@ -5799,10 +5837,10 @@ HealingTab:CreateSlider({
 })
 
 HealingTab:CreateSlider({
-    Name = "Transport Wait Time",
+    Name = "وقت انتظار النقل",
     Range = {0.5, 5},
     Increment = 0.5,
-    Suffix = " seconds",
+    Suffix = " ثانية",
     CurrentValue = HealingControl.TeleportCooldown,
     Flag = "Healing_TeleportCooldown",
     Callback = function(val)
@@ -5811,7 +5849,7 @@ HealingTab:CreateSlider({
 })
 
 HealingTab:CreateDropdown({
-    Name = "Healing Item Type",
+    Name = "نوع عنصر العلاج",
     Options = CreateTranslatedOptions(HealingItemTypes),
     CurrentOption = {GetDisplayText(HealingItemTypes[1])},
     Flag = "Healing_ItemType",
@@ -5887,7 +5925,7 @@ local function stopHealthMonitoring()
 end
 
 HealingTab:CreateToggle({
-    Name = "Auto Safe Place",
+    Name = "مكان آمن تلقائي",
     CurrentValue = false,
     Flag = "Healing_AutoSafePlace",
     Callback = function(v)
@@ -5901,10 +5939,10 @@ HealingTab:CreateToggle({
 })
 
 HealingTab:CreateSlider({
-    Name = "Health Threshold",
+    Name = "حد نقاط الحياة",
     Range = {1, 100},
     Increment = 1,
-    Suffix = " HP",
+    Suffix = " نقطة حياة",
     CurrentValue = AutoSafePlaceControl.HealthThreshold,
     Flag = "Healing_HealthThreshold",
     Callback = function(val)
@@ -5913,7 +5951,7 @@ HealingTab:CreateSlider({
 })
 
 HealingTab:CreateDropdown({
-    Name = "Teleport Location",
+    Name = "موقع النقل",
     Options = {"MainFire", "Underground"},
     CurrentOption = {"MainFire"},
     Flag = "Healing_TeleportLocation",
@@ -5922,10 +5960,10 @@ HealingTab:CreateDropdown({
     end
 })
 
--- ========== AMMO TELEPORTER CONTROLS ==========
+-- ========== أدوات التحكم في ناقل الذخيرة ==========
 
 AmmoTab:CreateToggle({
-    Name = "🔫 Enable Ammo Transporter",
+    Name = "🔫 تفعيل ناقل الذخيرة",
     CurrentValue = false,
     Flag = "Ammo_EnableTeleport",
     Callback = function(v)
@@ -5947,10 +5985,10 @@ AmmoTab:CreateToggle({
 })
 
 AmmoTab:CreateSlider({
-    Name = "Teleport Height",
+    Name = "ارتفاع النقل",
     Range = {0, 50},
     Increment = 1,
-    Suffix = " studs",
+    Suffix = " وحدة",
     CurrentValue = 35,
     Flag = "Ammo_TeleportHeight",
     Callback = function(v)
@@ -5959,10 +5997,10 @@ AmmoTab:CreateSlider({
 })
 
 AmmoTab:CreateSlider({
-    Name = "Transport Wait Time",
+    Name = "وقت انتظار النقل",
     Range = {0.5, 5},
     Increment = 0.1,
-    Suffix = " seconds",
+    Suffix = " ثانية",
     CurrentValue = AmmoControl.TeleportCooldown,
     Flag = "Ammo_TeleportCooldown",
     Callback = function(val)
@@ -5971,7 +6009,7 @@ AmmoTab:CreateSlider({
 })
 
 AmmoTab:CreateDropdown({
-    Name = "Ammo Type",
+    Name = "نوع الذخيرة",
     Options = CreateTranslatedOptions(AmmoItemTypes),
     CurrentOption = {GetDisplayText(AmmoItemTypes[1])},
     Flag = "Ammo_ItemType",
@@ -5990,7 +6028,7 @@ AmmoTab:CreateDropdown({
 -- Create dropdowns for each chest type
 for _, chestType in pairs(ChestTypes) do
     ChestDropdowns[chestType] = ChestsTab:CreateDropdown({
-        Name = chestType,
+        Name = DisplayTranslations[chestType] or chestType,
         Options = {"None"},
         CurrentOption = {"None"},
         Flag = "ChestSelector_" .. chestType:gsub(" ", "_"), -- Create unique flag for each dropdown
@@ -6002,17 +6040,17 @@ end
 
 -- Manual refresh button for all chest dropdowns
 ChestsTab:CreateButton({
-    Name = "🔄 Update All Chest Lists",
+    Name = "🔄 تحديث جميع قوائم الصناديق",
     Callback = function()
         UpdateAllChestDropdowns()
     end
 })
 
--- ========== ESP GUI CONTROLS (ELEGANT & MODERN) ==========
+-- ========== أدوات التحكم في نظام الرؤية الإضافية (أنيق وحديث) ==========
 
--- Master ESP Toggle
+-- مفتاح نظام الرؤية الإضافية الرئيسي
 ESPTab:CreateToggle({
-    Name = "🔍 Enable ESP",
+    Name = "🔍 تفعيل نظام الرؤية الإضافية",
     CurrentValue = false,
     Flag = "ESP_Master",
     Callback = function(Value)
@@ -6025,9 +6063,9 @@ ESPTab:CreateToggle({
     end
 })
 
--- Individual Color Pickers for Each Category
+-- منتقيات الألوان الفردية لكل فئة
 ESPTab:CreateColorPicker({
-    Name = "🍖 Food Color",
+    Name = "🍖 لون الطعام",
     Color = ESPControl.Colors.Food,
     Flag = "ESP_FoodColor",
     Callback = function(Value)
@@ -6048,7 +6086,7 @@ ESPTab:CreateColorPicker({
 })
 
 ESPTab:CreateColorPicker({
-    Name = "🦊 Animal Pelts Color",
+    Name = "🦊 لون جلود الحيوانات",
     Color = ESPControl.Colors.AnimalPelts,
     Flag = "ESP_AnimalPeltsColor",
     Callback = function(Value)
@@ -6069,7 +6107,7 @@ ESPTab:CreateColorPicker({
 })
 
 ESPTab:CreateColorPicker({
-    Name = "💊 Healing Color",
+    Name = "💊 لون العلاج",
     Color = ESPControl.Colors.Healing,
     Flag = "ESP_HealingColor",
     Callback = function(Value)
@@ -6090,7 +6128,7 @@ ESPTab:CreateColorPicker({
 })
 
 ESPTab:CreateColorPicker({
-    Name = "🔫 Ammo Color",
+    Name = "🔫 لون الذخيرة",
     Color = ESPControl.Colors.Ammo,
     Flag = "ESP_AmmoColor",
     Callback = function(Value)
@@ -6111,7 +6149,7 @@ ESPTab:CreateColorPicker({
 })
 
 ESPTab:CreateColorPicker({
-    Name = "👹 Entities Color",
+    Name = "👹 لون الكائنات",
     Color = ESPControl.Colors.Entities,
     Flag = "ESP_EntitiesColor",
     Callback = function(Value)
@@ -6132,7 +6170,7 @@ ESPTab:CreateColorPicker({
 })
 
 ESPTab:CreateColorPicker({
-    Name = "📦 Chests Color",
+    Name = "📦 لون الصناديق",
     Color = ESPControl.Colors.Chests,
     Flag = "ESP_ChestsColor",
     Callback = function(Value)
@@ -6153,7 +6191,7 @@ ESPTab:CreateColorPicker({
 })
 
 ESPTab:CreateColorPicker({
-    Name = "👤 Players Color",
+    Name = "👤 لون اللاعبين",
     Color = ESPControl.Colors.Players,
     Flag = "ESP_PlayersColor",
     Callback = function(Value)
@@ -6173,9 +6211,9 @@ ESPTab:CreateColorPicker({
     end
 })
 
--- Category Toggles
+-- مفاتيح الفئات
 ESPTab:CreateToggle({
-    Name = "🍖 Food",
+    Name = "🍖 الطعام",
     CurrentValue = false,
     Flag = "ESP_Food",
     Callback = function(Value)
@@ -6187,7 +6225,7 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateToggle({
-    Name = "🦊 Animal Pelts",
+    Name = "🦊 جلود الحيوانات",
     CurrentValue = false,
     Flag = "ESP_AnimalPelts",
     Callback = function(Value)
@@ -6199,7 +6237,7 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateToggle({
-    Name = "💊 Healing Items",
+    Name = "💊 أدوات العلاج",
     CurrentValue = false,
     Flag = "ESP_Healing",
     Callback = function(Value)
@@ -6211,7 +6249,7 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateToggle({
-    Name = "🔫 Ammo",
+    Name = "🔫 الذخيرة",
     CurrentValue = false,
     Flag = "ESP_Ammo",
     Callback = function(Value)
@@ -6223,7 +6261,7 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateToggle({
-    Name = "👹 Entities",
+    Name = "👹 الكائنات",
     CurrentValue = false,
     Flag = "ESP_Entities",
     Callback = function(Value)
@@ -6235,7 +6273,7 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateToggle({
-    Name = "📦 Chests",
+    Name = "📦 الصناديق",
     CurrentValue = false,
     Flag = "ESP_Chests",
     Callback = function(Value)
@@ -6247,7 +6285,7 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateToggle({
-    Name = "👤 Players",
+    Name = "👤 اللاعبون",
     CurrentValue = false,
     Flag = "ESP_Players",
     Callback = function(Value)
@@ -6258,9 +6296,9 @@ ESPTab:CreateToggle({
     end
 })
 
--- Utility Buttons
+-- أزرار المرافق
 ESPTab:CreateButton({
-    Name = "🔄 Update All ESP",
+    Name = "🔄 تحديث كامل نظام الرؤية الإضافية",
     Callback = function()
         if ESPControl.Enabled then
             ClearAllESP()
@@ -6270,16 +6308,16 @@ ESPTab:CreateButton({
 })
 
 ESPTab:CreateButton({
-    Name = "🧹 Clear All ESP",
+    Name = "🧹 مسح كامل نظام الرؤية الإضافية",
     Callback = function()
         ClearAllESP()
     end
 })
 
--- ========== SKYBASE GUI CONTROLS ==========
+-- ========== أدوات التحكم في واجهة قاعدة السماء ==========
 
 SkybaseTab:CreateToggle({
-    Name = "🏗️ Show Skybase Interface",
+    Name = "🏗️ عرض واجهة قاعدة السماء",
     CurrentValue = false,
     Flag = "Skybase_ShowGui",
     Callback = function(v)
@@ -6293,7 +6331,7 @@ SkybaseTab:CreateToggle({
 })
 
 SkybaseTab:CreateToggle({
-    Name = "🍽️ Smart Auto Eating",
+    Name = "🍽️ الأكل التلقائي الذكي",
     CurrentValue = false,
     Flag = "Skybase_SmartAutoEat",
     Callback = function(v)
@@ -6302,10 +6340,10 @@ SkybaseTab:CreateToggle({
 })
 
 SkybaseTab:CreateSlider({
-    Name = "🎯 Hunger Threshold for Eating",
+    Name = "🎯 حد الجوع للأكل",
     Range = {20, 150},
     Increment = 5,
-    Suffix = "points",
+    Suffix = " نقطة",
     CurrentValue = 50,
     Flag = "Skybase_HungerThreshold",
     Callback = function(v)
@@ -6314,7 +6352,7 @@ SkybaseTab:CreateSlider({
 })
 
 SkybaseTab:CreateToggle({
-    Name = "⚡ Anti-AFK Protection",
+    Name = "⚡ حماية ضد عدم النشاط",
     CurrentValue = false,
     Flag = "Skybase_AntiAfk",
     Callback = function(v)
@@ -6328,15 +6366,15 @@ SkybaseTab:CreateToggle({
     end
 })
 
-SkybaseTab:CreateLabel("To get maximum benefit, build a base in the sky")
-SkybaseTab:CreateLabel("Then bring crop fields, try to get a large quantity and place them all on the base")
-SkybaseTab:CreateLabel("🍎 Enable smart eating feature and set hunger to 100-150 as you prefer")
-SkybaseTab:CreateLabel("Then go to your bed and sleep peacefully �")
-SkybaseTab:CreateLabel("❤️ Happy gaming!")
+SkybaseTab:CreateLabel("للحصول على أقصى فائدة، ابنِ قاعدة في السماء")
+SkybaseTab:CreateLabel("ثم أحضر حقول المحاصيل، حاول الحصول على كمية كبيرة وضعها كلها على القاعدة")
+SkybaseTab:CreateLabel("🍎 فعّل ميزة الأكل الذكي واضبط الجوع على 100-150 حسب تفضيلك")
+SkybaseTab:CreateLabel("ثم اذهب إلى سريرك وانم بهدوء 😴")
+SkybaseTab:CreateLabel("❤️ لعب سعيد!")
 
--- Lost Children Controls
+-- أدوات التحكم في الأطفال المفقودين
 LostChildrenToggle = LostChildrenTab:CreateToggle({
-    Name = "Enable Lost Children Rescue",
+    Name = "تفعيل إنقاذ الأطفال المفقودين",
     CurrentValue = false,
     Flag = "RescueChildrenToggle",
     Callback = function(value)
@@ -6348,13 +6386,13 @@ LostChildrenToggle = LostChildrenTab:CreateToggle({
     end
 })
 
-LostChildrenStatus = LostChildrenTab:CreateLabel("Status: Inactive")
+LostChildrenStatus = LostChildrenTab:CreateLabel("الحالة: غير نشط")
 
-LostChildrenTab:CreateLabel("ℹ️ How it works:")
-LostChildrenTab:CreateLabel("• Make sure the fire is at maximum level")
-LostChildrenTab:CreateLabel("• Make sure the sack has 4 empty spaces")
-LostChildrenTab:CreateLabel("• Don't worry if it starts moving alone, it's searching for them")
-LostChildrenTab:CreateLabel("• After collecting all children, it will return to your location")
+LostChildrenTab:CreateLabel("ℹ️ كيف يعمل:")
+LostChildrenTab:CreateLabel("• تأكد من أن النار في أقصى مستوى")
+LostChildrenTab:CreateLabel("• تأكد من أن الكيس به 4 مساحات فارغة")
+LostChildrenTab:CreateLabel("• لا تقلق إذا بدأ يتحرك وحده، إنه يبحث عنهم")
+LostChildrenTab:CreateLabel("• بعد جمع جميع الأطفال، سيعود إلى موقعك")
 
 -- Saplings GUI Toggle with Integrated Code
 local SaplingsGUI = nil
@@ -6446,7 +6484,7 @@ local function createSaplingsGUI()
         shapePoints = {}
         isPlanting = false  -- Also stop any ongoing planting
         if guiElements.ProgressLabel then 
-            guiElements.ProgressLabel.Text = "Progress: N/A" 
+            guiElements.ProgressLabel.Text = "التقدم: غير متاح" 
         end
         print("Shape cleared completely.") 
     end
@@ -6555,7 +6593,7 @@ local function createSaplingsGUI()
         end
         
         if guiElements.ProgressLabel then 
-            guiElements.ProgressLabel.Text = "Progress: 0 / " .. #shapePoints 
+            guiElements.ProgressLabel.Text = "التقدم: 0 / " .. #shapePoints 
         end
     end
     
@@ -6656,7 +6694,7 @@ local function createSaplingsGUI()
     headerGradient.Rotation = 45
     headerGradient.Parent = headerFrame
     
-    local titleLabel = createLabel(headerFrame, UDim2.new(1, -60, 1, 0), UDim2.new(0, 15, 0, 0), "🌱 Sapling Planter", THEME.COLORS.TEXT, 14, Enum.Font.GothamBold)
+    local titleLabel = createLabel(headerFrame, UDim2.new(1, -60, 1, 0), UDim2.new(0, 15, 0, 0), "🌱 زارع الشتلات", THEME.COLORS.TEXT, 14, Enum.Font.GothamBold)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     
     -- Minimize button
@@ -6716,10 +6754,10 @@ local function createSaplingsGUI()
     
     -- Shape selection section
     local shapeSection = createRoundedFrame(contentFrame, UDim2.new(1, -20, 0, 32), UDim2.new(0, 10, 0, 10), THEME.COLORS.SURFACE, 6)
-    local shapeSectionLabel = createLabel(shapeSection, UDim2.new(1, -15, 0, 14), UDim2.new(0, 12, 0, 2), "Shape Configuration", THEME.COLORS.TEXT_SECONDARY, 9, Enum.Font.GothamMedium)
+    local shapeSectionLabel = createLabel(shapeSection, UDim2.new(1, -15, 0, 14), UDim2.new(0, 12, 0, 2), "إعدادات الشكل", THEME.COLORS.TEXT_SECONDARY, 9, Enum.Font.GothamMedium)
     
     local shapeDropdown = createRoundedFrame(shapeSection, UDim2.new(1, -24, 0, 18), UDim2.new(0, 12, 0, 14), THEME.COLORS.SECONDARY, 4)
-    local shapeLabel = createLabel(shapeDropdown, UDim2.new(1, -25, 1, 0), UDim2.new(0, 8, 0, 0), "Shape: " .. currentShape, THEME.COLORS.TEXT, 10)
+    local shapeLabel = createLabel(shapeDropdown, UDim2.new(1, -25, 1, 0), UDim2.new(0, 8, 0, 0), "الشكل: " .. currentShape, THEME.COLORS.TEXT, 10)
     
     local shapeBtn = Instance.new("TextButton")
     shapeBtn.Size = UDim2.new(1, 0, 1, 0)
@@ -6792,7 +6830,7 @@ local function createSaplingsGUI()
         local optionBtn = createButton(shapeOptionsFrame, UDim2.new(1, -8, 0, 18), UDim2.new(0, 4, 0, (i-1) * 19), shapeName, THEME.COLORS.BACKGROUND, THEME.COLORS.TEXT, function()
             print("Shape selected:", shapeName, "Current shape was:", currentShape)
             currentShape = shapeName
-            shapeLabel.Text = "Shape: " .. currentShape
+            shapeLabel.Text = "الشكل: " .. currentShape
             shapeOptionsFrame.Visible = false
             dropdownIcon.Text = "▼"
             print("Shape updated to:", currentShape, "Label updated to:", shapeLabel.Text)
@@ -6985,7 +7023,7 @@ local function createSaplingsGUI()
     
     -- Progress display (Mobile-optimized)
     local progressFrame = createRoundedFrame(buttonSection, UDim2.new(1, -16, 0, 16), UDim2.new(0, 8, 0, 29), THEME.COLORS.BACKGROUND, 4)
-    local progressLabel = createLabel(progressFrame, UDim2.new(1, -12, 1, 0), UDim2.new(0, 12, 0, 0), "Progress: N/A", THEME.COLORS.TEXT, 9, Enum.Font.GothamMedium)
+    local progressLabel = createLabel(progressFrame, UDim2.new(1, -12, 1, 0), UDim2.new(0, 12, 0, 0), "التقدم: غير متاح", THEME.COLORS.TEXT, 9, Enum.Font.GothamMedium)
     progressLabel.TextXAlignment = Enum.TextXAlignment.Center
     guiElements.ProgressLabel = progressLabel
     
@@ -7046,7 +7084,7 @@ local function createSaplingsGUI()
                 end
             end
             
-            guiElements.ProgressLabel.Text = "Progress: " .. plantedCount .. " / " .. #shapePoints
+            guiElements.ProgressLabel.Text = "التقدم: " .. plantedCount .. " / " .. #shapePoints
             print("Found " .. #availableSaplings .. " saplings.")
             
             for i, pointData in ipairs(shapePoints) do
@@ -7076,7 +7114,7 @@ local function createSaplingsGUI()
                         print("Planted sapling #"..i)
                         pointData.status = "Planted"
                         plantedCount = plantedCount + 1
-                        guiElements.ProgressLabel.Text = "Progress: " .. plantedCount .. " / " .. #shapePoints
+                        guiElements.ProgressLabel.Text = "التقدم: " .. plantedCount .. " / " .. #shapePoints
                         
                         local highlight = highlightParts[pointData.highlightIndex]
                         if highlight then 
@@ -7122,7 +7160,7 @@ local function destroySaplingsGUI()
 end
 
 GUITap:CreateToggle({
-    Name = "Saplings Planter GUI",
+    Name = "واجهة زارع الشتلات",
     CurrentValue = false,
     Flag = "GUI_SaplingsEnabled",
     Callback = function(v)
@@ -7134,26 +7172,26 @@ GUITap:CreateToggle({
     end
 })
 
--- Credits Section Content
-CreditsTab:CreateLabel("Developer: Toasty")
-CreditsTab:CreateLabel("Thank you for using this script!")
+-- محتوى قسم الائتمانات
+CreditsTab:CreateLabel("المطور: Toasty")
+CreditsTab:CreateLabel("شكراً لاستخدام هذا الاسكربت!")
 
 CreditsTab:CreateButton({
-    Name = "📋 Copy Discord Link",
+    Name = "📋 نسخ رابط الديسكورد",
     Callback = function()
         setclipboard("https://discord.gg/DYNb3eHE")
         ApocLibrary:Notify({
-            Title = "Discord Link Copied!",
-            Content = "Discord link has been copied to clipboard",
+            Title = "تم نسخ رابط الديسكورد!",
+            Content = "تم نسخ رابط الديسكورد إلى الحافظة",
             Duration = 3,
             Image = 4483362458,
         })
     end
 })
 
-CreditsTab:CreateLabel("Found a bug or have suggestions?")
-CreditsTab:CreateLabel("Don't hesitate to report them on Discord!")
-CreditsTab:CreateLabel("💡 Use Transport To: Player if the scrapper gets stuck")
+CreditsTab:CreateLabel("وجدت خطأ أو لديك اقتراحات؟")
+CreditsTab:CreateLabel("لا تتردد في الإبلاغ عنها في الديسكورد!")
+CreditsTab:CreateLabel("💡 استخدم النقل إلى: اللاعب إذا تعطل المجمع")
 
 -- Initial application (in case character already spawned)
 task.delay(0.1, UpdateAll)
@@ -7161,4 +7199,38 @@ task.delay(0.1, UpdateAll)
 -- Initial chest dropdown population
 task.delay(1, function()
     UpdateAllChestDropdowns()
+end)
+
+-- Islamic Reminder Notification System
+local IslamicReminders = {
+    "صلِّ على النبي محمد ﷺ", -- Pray upon Prophet Muhammad
+    "سبحان الله وبحمده", -- Glory be to Allah and praise Him
+    "لا إله إلا الله", -- There is no god but Allah
+    "الله أكبر", -- Allah is the Greatest
+    "أستغفر الله العظيم", -- I seek forgiveness from Allah the Great
+    "الحمد لله رب العالمين", -- Praise be to Allah, Lord of the worlds
+    "لا حول ولا قوة إلا بالله", -- There is no power except with Allah
+    "سبحان الله العظيم", -- Glory be to Allah the Great
+    "اللهم صل وسلم على نبينا محمد", -- O Allah, send blessings and peace upon our Prophet Muhammad
+    "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً" -- Our Lord, give us good in this world and good in the next world
+}
+
+-- Function to show random Islamic reminder
+local function ShowIslamicReminder()
+    local randomReminder = IslamicReminders[math.random(1, #IslamicReminders)]
+    
+    ApocLibrary:Notify({
+        Title = "ذكر الله 🤲",
+        Content = randomReminder,
+        Duration = 3,
+        Image = 4483362458,
+    })
+end
+
+-- Start the reminder system (every 60 seconds)
+task.spawn(function()
+    while true do
+        task.wait(60) -- Wait 1 minute (60 seconds)
+        ShowIslamicReminder()
+    end
 end)
