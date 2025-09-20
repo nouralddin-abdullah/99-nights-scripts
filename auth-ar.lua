@@ -3,13 +3,13 @@
 -- ################################# --
 
 -- اضبط الروابط هنا
-local MAIN_SCRIPT_URL = "https://pastefy.app/JbmV2rtK/raw" -- ضع رابط السكريبت الرئيسي هنا
-local KEY_URL = "https://pastebin.com/raw/a1Uz1nL1" -- ضع رابط المفتاح هنا
-local SHORTCUT_LINK = "https://exe.io/hUhBl" -- ضع الرابط المطلوب للحصول على المفتاح
+local MAIN_SCRIPT_URL = "https://pastefy.app/JbmV2rtK/raw" -- ضع رابط السكريبت الرئيسي هنا (Arabic version)
+local KEY_URL = "https://pastefy.app/Q4X1xLAN/raw" -- ضع رابط المفتاح هنا
+local SHORTCUT_LINK = "https://exe-links.com/99-nights-key" -- ضع الرابط المطلوب للحصول على المفتاح
 local DISCORD_LINK = "https://discord.gg/pH3NyVYC72" -- رابط الديسكورد
 
 -- إعدادات المصادقة
-local REQUIRE_KEY = false -- اجعله false لتجاهل التحقق من المفتاح وتشغيل السكريبت مباشرة
+local REQUIRE_KEY = true -- اجعله false لتجاهل التحقق من المفتاح وتشغيل السكريبت مباشرة
 
 -- ################################# --
 -- ## واجهة المستخدم والمنطق ## --
@@ -153,6 +153,8 @@ KeyInput.Text = ""
 KeyInput.Font = Enum.Font.Gotham
 KeyInput.TextSize = 14
 KeyInput.TextColor3 = Color3.new(1, 1, 1)
+KeyInput.TextXAlignment = Enum.TextXAlignment.Left
+KeyInput.ClearTextOnFocus = false
 KeyInput.Parent = MainFrame
 local UICorner3 = Instance.new("UICorner", KeyInput)
 UICorner3.CornerRadius = UDim.new(0, 8)

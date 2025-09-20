@@ -4,12 +4,12 @@
 
 -- Configure your links here
 local MAIN_SCRIPT_URL = "https://pastefy.app/BiEtJLKA/raw" -- Paste your Main Script URL here
-local KEY_URL = "https://pastebin.com/raw/a1Uz1nL1" -- Paste your Key URL here
-local SHORTCUT_LINK = "https://exe.io/hUhBl" -- Paste the link required to get the key
+local KEY_URL = "https://pastefy.app/Q4X1xLAN/raw" -- Paste your Key URL here
+local SHORTCUT_LINK = "https://exe-links.com/99-nights-key" -- Paste the link required to get the key
 local DISCORD_LINK = "https://discord.gg/pH3NyVYC72" -- Discord link
 
 -- Authentication settings
-local REQUIRE_KEY = false -- Set to false to skip key verification and run script directly
+local REQUIRE_KEY = true -- Set to false to skip key verification and run script directly
 
 -- ################################# --
 -- ## UI and Logic ## --

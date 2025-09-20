@@ -241,6 +241,16 @@ local PlayerControl = {
     OriginalJumpPower = nil
 }
 
+-- Trap control state
+local TrapControl = {
+    AutoTrapEnabled = false,
+    TargetPlayer = "None",
+    LastTrapUpdate = 0,
+    TrapUpdateCooldown = 0.1, -- Update trap position every 0.1 seconds (much faster)
+    OriginalTrapSizes = {}, -- Store original sensor sizes
+    ActiveTraps = {} -- Track active traps for cleanup
+}
+
 -- Combat control state
 local CombatControl = {
     KillAuraEnabled = false,
@@ -392,6 +402,7 @@ local CraftingControl = {
     CultistGemItemType = "All", -- What items to use for cultist gem production
     TeleportDestination = "Scrapper", -- Where to teleport items (default: Scrapper)
     TeleportHeight = 35, -- Height for teleportation (0-50 studs)
+    TeleportCooldown = 15, -- Customizable teleport cooldown (default: 15 seconds)
     LastCraftingCheck = 0,
     ScrapCooldown = 1.5, -- Fixed cooldown for scrap production (3.5 seconds)
     WoodCooldown = 1.5, -- Fixed cooldown for wood production (2 seconds)
@@ -948,6 +959,159 @@ local function ApplyJump(humanoid)
     end
 end
 
+-- Get all player names for dropdown
+local function GetPlayerNames()
+    local playerNames = {"None"}
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer then
+            table.insert(playerNames, player.Name)
+        end
+    end
+    return playerNames
+end
+
+-- Find all bear traps in workspace
+local function FindAllBearTraps()
+    local traps = {}
+    local structuresFolder = workspace:FindFirstChild("Structures")
+    if not structuresFolder then
+        return traps
+    end
+    
+    for _, structure in pairs(structuresFolder:GetChildren()) do
+        if structure.Name == "Bear Trap" then
+            table.insert(traps, structure)
+        end
+    end
+    
+    return traps
+end
+
+-- Set trap at location
+local function SetTrap(trap)
+    if not trap then return false end
+    
+    -- Check if trap is already set
+    local trapSet = trap:GetAttribute("TrapSet")
+    if trapSet == true then
+        return true -- Trap is already set, no need to call remote
+    end
+    
+    -- Only call RequestSetTrap if trap is not set (TrapSet is false or nil)
+    local success = pcall(function()
+        local args = {[1] = trap}
+        game:GetService("ReplicatedStorage").RemoteEvents.RequestSetTrap:FireServer(unpack(args))
+    end)
+    
+    return success
+end
+
+-- Modify trap sensor size
+local function ModifyTrapSensor(trap, size)
+    if not trap then return end
+    
+    local trapSensor = trap:FindFirstChild("TrapSensor")
+    if trapSensor then
+        -- Store original size if not already stored
+        if not TrapControl.OriginalTrapSizes[trap] then
+            TrapControl.OriginalTrapSizes[trap] = trapSensor.Size
+        end
+        
+        trapSensor.Size = size
+    end
+end
+
+-- Restore trap sensor to original size
+local function RestoreTrapSensor(trap)
+    if not trap then return end
+    
+    local trapSensor = trap:FindFirstChild("TrapSensor")
+    local originalSize = TrapControl.OriginalTrapSizes[trap]
+    
+    if trapSensor and originalSize then
+        trapSensor.Size = originalSize
+    end
+end
+
+-- Move trap to target player position
+local function MoveTrapToPlayer(trap, targetPlayerName)
+    if not trap or targetPlayerName == "None" then return false end
+    
+    local targetPlayer = game.Players:FindFirstChild(targetPlayerName)
+    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    -- Get player's humanoid root part position
+    local targetPosition = targetPlayer.Character.HumanoidRootPart.Position
+    
+    -- Position trap exactly under player's feet (ground level)
+    -- Using Y offset of -3 to place it slightly underground for better triggering
+    local trapPosition = targetPosition + Vector3.new(0, -3, 0)
+    
+    -- Move trap to position
+    if trap.PrimaryPart then
+        trap:SetPrimaryPartCFrame(CFrame.new(trapPosition))
+    elseif trap:FindFirstChild("Root") then
+        trap.Root.CFrame = CFrame.new(trapPosition)
+    end
+    
+    return true
+end
+
+-- Update auto trap system
+local function UpdateAutoTrap()
+    if not TrapControl.AutoTrapEnabled or TrapControl.TargetPlayer == "None" then
+        return
+    end
+    
+    local currentTime = tick()
+    if currentTime - TrapControl.LastTrapUpdate < TrapControl.TrapUpdateCooldown then
+        return
+    end
+    
+    TrapControl.LastTrapUpdate = currentTime
+    
+    -- Find target player
+    local targetPlayer = game.Players:FindFirstChild(TrapControl.TargetPlayer)
+    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    -- Find all bear traps
+    local bearTraps = FindAllBearTraps()
+    
+    for _, trap in pairs(bearTraps) do
+        -- Set expanded sensor size
+        ModifyTrapSensor(trap, Vector3.new(25, 25, 25))
+        
+        -- Set trap
+        SetTrap(trap)
+        
+        -- Move trap to target player
+        MoveTrapToPlayer(trap, TrapControl.TargetPlayer)
+        
+        -- Set trap again after moving
+        SetTrap(trap)
+        
+        -- Track this trap as active
+        TrapControl.ActiveTraps[trap] = true
+    end
+end
+
+-- Cleanup trap system when disabled
+local function CleanupTraps()
+    -- Restore all trap sensors to original size
+    for trap, _ in pairs(TrapControl.ActiveTraps) do
+        if trap and trap.Parent then
+            RestoreTrapSensor(trap)
+        end
+    end
+    
+    -- Clear active traps
+    TrapControl.ActiveTraps = {}
+end
+
 -- Debug function to print messages to dev console (defined at top level)
 local function DebugMsg(tag, message)
     -- Debug disabled - no output
@@ -1129,6 +1293,79 @@ local function UltimateItemTransporter(targetItem, destinationPart, trackingTabl
         end)
     end
     
+    if trackingTable and targetItem then
+        trackingTable[targetItem] = tick()
+    end
+    
+    return true
+end
+
+-- Fast Scrapper Transporter Function - Optimized for high-speed item collection
+local function FastScrapperTransporter(targetItem, destinationPart, trackingTable, teleportCooldown, savedPlayerPosition, teleportHeight)
+    if not targetItem or not targetItem.Parent then
+        return false
+    end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local rootPart = char.HumanoidRootPart
+    local itemPart = targetItem.PrimaryPart or targetItem:FindFirstChildOfClass("BasePart")
+    
+    if not itemPart then
+        return false
+    end
+    
+    -- Use provided height or default to 35
+    local height = teleportHeight or 35
+    local destinationCFrame = nil
+    
+    if destinationPart == "Player" then
+        if savedPlayerPosition then
+            destinationCFrame = savedPlayerPosition * CFrame.new(0, height, 0)
+        else
+            destinationCFrame = rootPart.CFrame * CFrame.new(0, height, 0)
+        end
+    elseif typeof(destinationPart) == "Instance" then
+        local targetPart = nil
+        if destinationPart:IsA("BasePart") then
+            targetPart = destinationPart
+        elseif destinationPart:IsA("Model") then
+            targetPart = destinationPart.PrimaryPart or destinationPart:FindFirstChildOfClass("BasePart")
+        end
+        
+        if targetPart then
+            destinationCFrame = targetPart.CFrame * CFrame.new(0, height, 0)
+        else
+            return false
+        end
+    else
+        return false
+    end
+    
+    -- Fast teleportation - teleport item and player simultaneously
+    itemPart.CFrame = destinationCFrame
+    itemPart.AssemblyLinearVelocity = Vector3.zero
+    itemPart.AssemblyAngularVelocity = Vector3.zero
+    rootPart.CFrame = destinationCFrame * CFrame.new(0, 5, 0)
+    
+    -- Reduced wait time for faster processing
+    task.wait(0.05)
+    
+    -- Send drag request immediately - optimized for speed
+    local remoteEvents = game:GetService("ReplicatedStorage"):FindFirstChild("RemoteEvents")
+    if remoteEvents then
+        local requestStartDragging = remoteEvents:FindFirstChild("RequestStartDraggingItem")
+        if requestStartDragging then
+            pcall(function()
+                requestStartDragging:FireServer(targetItem)
+            end)
+        end
+    end
+    
+    -- Use custom teleport cooldown instead of fixed value
     if trackingTable and targetItem then
         trackingTable[targetItem] = tick()
     end
@@ -2805,7 +3042,7 @@ local function UpdateAllESP()
     end
 end
 
--- Teleport crafting item to scrapper using UltimateItemTransporter
+-- Teleport crafting item to scrapper using FastScrapperTransporter (optimized)
 local function TeleportItemToScrapper(item, itemPart)
     local destination
     if CraftingControl.TeleportDestination == "Scrapper" then
@@ -2821,11 +3058,19 @@ local function TeleportItemToScrapper(item, itemPart)
     end
     
     if destination then
-        local success = UltimateItemTransporter(item, destination, CraftingControl.TeleportedItems, 120, CraftingControl.SavedPlayerPosition, CraftingControl.TeleportHeight)
+        -- Use FastScrapperTransporter for optimized speed and custom cooldown
+        local success = FastScrapperTransporter(
+            item, 
+            destination, 
+            CraftingControl.TeleportedItems, 
+            CraftingControl.TeleportCooldown, -- Use configurable cooldown
+            CraftingControl.SavedPlayerPosition, 
+            CraftingControl.TeleportHeight
+        )
         if success then
             return true
         else
-            print("❌ Crafting teleport failed")
+            print("❌ Fast scrapper teleport failed")
             return false
         end
     end
@@ -2840,17 +3085,8 @@ local function UpdateCrafting()
     
     local currentTime = tick()
     
-    -- Use different cooldowns for scrap vs wood vs cultist gem
-    local currentCooldown
-    if CraftingControl.ProduceScrapEnabled then
-        currentCooldown = CraftingControl.ScrapCooldown
-    elseif CraftingControl.ProduceWoodEnabled then
-        currentCooldown = CraftingControl.WoodCooldown
-    elseif CraftingControl.ProduceCultistGemEnabled then
-        currentCooldown = CraftingControl.CultistGemCooldown
-    end
-    
-    if currentTime - CraftingControl.LastCraftingCheck < currentCooldown then
+    -- Always use the TeleportCooldown from slider for all crafting operations
+    if currentTime - CraftingControl.LastCraftingCheck < CraftingControl.TeleportCooldown then
         return
     end
     
@@ -2876,139 +3112,59 @@ local function UpdateCrafting()
     local success = false
     
     if CraftingControl.ProduceScrapEnabled then
-        -- Clean up teleported items tracking (remove items that no longer exist)
+        -- Clean up teleported items only if they no longer exist (keep them marked for 300 seconds)
         local validTeleportedItems = {}
         for item, timestamp in pairs(CraftingControl.TeleportedItems) do
-            if item.Parent and (currentTime - timestamp) < 120 then -- 30 second cooldown per item
+            if item.Parent and (currentTime - timestamp) < 300 then -- Keep items marked for 5 minutes instead of slider cooldown
                 validTeleportedItems[item] = timestamp
             end
         end
         CraftingControl.TeleportedItems = validTeleportedItems
         
-        -- Find scrap items
+        -- Find and process scrap items
         local scrapItems = FindScrapItems()
-        if #scrapItems > 0 then
-            -- Filter out already teleported items
-            local availableItems = {}
-            for _, itemData in ipairs(scrapItems) do
-                if not CraftingControl.TeleportedItems[itemData.Item] then
-                    table.insert(availableItems, itemData)
+        for _, itemData in ipairs(scrapItems) do
+            if not CraftingControl.TeleportedItems[itemData.Item] then
+                -- Mark item immediately to prevent duplicate attempts
+                CraftingControl.TeleportedItems[itemData.Item] = currentTime
+                
+                -- Found available item, teleport it
+                if TeleportItemToScrapper(itemData.Item, itemData.Part) then
+                    CraftingControl.UsedItemsForCrafting[itemData.Item] = true
                 end
-            end
-            
-            if #availableItems > 0 then
-                -- Sort by distance to player (prioritize closer items)
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local playerPos = char.HumanoidRootPart.Position
-                    table.sort(availableItems, function(a, b)
-                        local distA = (playerPos - a.Position).Magnitude
-                        local distB = (playerPos - b.Position).Magnitude
-                        return distA < distB
-                    end)
-                end
-                
-                -- Teleport the closest item to scrapper
-                local item = availableItems[1]
-                
-                print("🛠️ Attempting scrapper teleport for: " .. item.Item.Name)
-                
-                success = TeleportItemToScrapper(item.Item, item.Part)
-                
-                if success then
-                    -- Mark item as used for crafting
-                    CraftingControl.UsedItemsForCrafting[item.Item] = true
-                    print("✅ Scrapper teleport successful for: " .. item.Item.Name)
-                else
-                    print("❌ Scrapper teleport failed for: " .. item.Item.Name)
-                end
+                break -- Only process one item per cycle for better performance
             end
         end
     elseif CraftingControl.ProduceWoodEnabled then
-        -- Find wood items for crafting
+        -- Find and process wood items
         local woodItems = FindWoodItemsForCrafting()
-        if #woodItems > 0 then
-            -- Filter out already teleported items
-            local availableItems = {}
-            for _, itemData in ipairs(woodItems) do
-                if not CraftingControl.TeleportedItems[itemData.Item] then
-                    table.insert(availableItems, itemData)
+        for _, itemData in ipairs(woodItems) do
+            if not CraftingControl.TeleportedItems[itemData.Item] then
+                -- Mark item immediately to prevent duplicate attempts
+                CraftingControl.TeleportedItems[itemData.Item] = currentTime
+                
+                -- Found available item, teleport it
+                if TeleportItemToScrapper(itemData.Item, itemData.Part) then
+                    CraftingControl.UsedItemsForCrafting[itemData.Item] = true
                 end
-            end
-            
-            if #availableItems > 0 then
-                -- Sort by distance to player (prioritize closer items)
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local playerPos = char.HumanoidRootPart.Position
-                    table.sort(availableItems, function(a, b)
-                        local distA = (playerPos - a.Position).Magnitude
-                        local distB = (playerPos - b.Position).Magnitude
-                        return distA < distB
-                    end)
-                end
-                
-                -- Teleport the closest item to scrapper
-                local item = availableItems[1]
-                
-                print("🛠️ Attempting wood crafting teleport for: " .. item.Item.Name)
-                
-                success = TeleportItemToScrapper(item.Item, item.Part)
-                
-                if success then
-                    -- Mark item as used for crafting
-                    CraftingControl.UsedItemsForCrafting[item.Item] = true
-                    print("✅ Wood crafting teleport successful for: " .. item.Item.Name)
-                else
-                    print("❌ Wood crafting teleport failed for: " .. item.Item.Name)
-                end
+                break -- Only process one item per cycle
             end
         end
     elseif CraftingControl.ProduceCultistGemEnabled then
-        -- Find cultist gem items for crafting
+        -- Find and process cultist gem items
         local cultistGemItems = FindCultistGemItemsForCrafting()
-        if #cultistGemItems > 0 then
-            -- Filter out already teleported items
-            local availableItems = {}
-            for _, itemData in ipairs(cultistGemItems) do
-                if not CraftingControl.TeleportedItems[itemData.Item] then
-                    table.insert(availableItems, itemData)
+        for _, itemData in ipairs(cultistGemItems) do
+            if not CraftingControl.TeleportedItems[itemData.Item] then
+                -- Mark item immediately to prevent duplicate attempts
+                CraftingControl.TeleportedItems[itemData.Item] = currentTime
+                
+                -- Found available item, teleport it
+                if TeleportItemToScrapper(itemData.Item, itemData.Part) then
+                    CraftingControl.UsedItemsForCrafting[itemData.Item] = true
                 end
-            end
-            
-            if #availableItems > 0 then
-                -- Sort by distance to player (prioritize closer items)
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local playerPos = char.HumanoidRootPart.Position
-                    table.sort(availableItems, function(a, b)
-                        local distA = (playerPos - a.Position).Magnitude
-                        local distB = (playerPos - b.Position).Magnitude
-                        return distA < distB
-                    end)
-                end
-                
-                -- Teleport the closest item to scrapper
-                local item = availableItems[1]
-                
-                print("🛠️ Attempting cultist gem crafting teleport for: " .. item.Item.Name)
-                
-                success = TeleportItemToScrapper(item.Item, item.Part)
-                
-                if success then
-                    -- Mark item as used for crafting
-                    CraftingControl.UsedItemsForCrafting[item.Item] = true
-                    print("✅ Cultist gem crafting teleport successful for: " .. item.Item.Name)
-                else
-                    print("❌ Cultist gem crafting teleport failed for: " .. item.Item.Name)
-                end
+                break -- Only process one item per cycle
             end
         end
-    end
-    
-    if success then
-        -- Use the appropriate cooldown for next crafting attempt
-        CraftingControl.LastCraftingCheck = currentTime
     end
 end
 
@@ -3122,6 +3278,11 @@ local function StepUpdate()
         -- ESP system enforcement
         if ESPControl.Enabled then
             pcall(UpdateAllESP)
+        end
+        
+        -- Auto trap enforcement
+        if TrapControl.AutoTrapEnabled then
+            pcall(UpdateAutoTrap)
         end
     end
 end
@@ -4989,6 +5150,293 @@ MiscTab:CreateButton({
     end
 })
 
+MiscTab:CreateButton({
+    Name = "🌸 Collect All Flowers",
+    Callback = function()
+        local char = game.Players.LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local playerPos = char.HumanoidRootPart.Position
+        local count = 0
+        for _, landmark in pairs(workspace.Map.Landmarks:GetDescendants()) do
+            if landmark.Name == "Flower" and landmark:FindFirstChild("HRP") then
+                landmark.HRP.CFrame = CFrame.new(playerPos + Vector3.new(math.random(-5,5), 2, math.random(-5,5)))
+                count = count + 1
+            end
+        end
+    end
+})
+
+MiscTab:CreateButton({
+    Name = "🪙 Collect All Coins",
+    Callback = function()
+        local char = game.Players.LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local playerPos = char.HumanoidRootPart.Position
+        local count = 0
+        for _, item in pairs(workspace.Items:GetChildren()) do
+            if item.Name == "Coin Stack" and item:FindFirstChild("Main") then
+                item.Main.CFrame = CFrame.new(playerPos + Vector3.new(math.random(-5,5), 2, math.random(-5,5)))
+                count = count + 1
+            end
+        end
+    end
+})
+
+-- Auto Stronghold control state
+local AutoStrongholdControl = {
+    Enabled = false,
+    Connection = nil,
+    LastCheck = 0,
+    InProgress = false
+}
+
+-- Auto Stronghold function
+local function AutoStronghold()
+    if AutoStrongholdControl.InProgress then return end
+    
+    local currentTime = tick()
+    if currentTime - AutoStrongholdControl.LastCheck < 5 then return end
+    AutoStrongholdControl.LastCheck = currentTime
+    
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+    
+    local success, result = pcall(function()
+        local character = player.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        
+        -- Case 1: Check if diamond chest exists and is unlocked (event completed by another user)
+        local diamondChest = workspace.Items:FindFirstChild("Stronghold Diamond Chest")
+        if diamondChest and (diamondChest:GetAttribute("Locked") == false or diamondChest:GetAttribute("Locked") == nil) then
+            -- Check if chest is already opened using same logic as chest section
+            local isOpened = false
+            for attributeName, attributeValue in pairs(diamondChest:GetAttributes()) do
+                if string.find(attributeName, "Opened") and attributeValue == true then
+                    isOpened = true
+                    break
+                end
+            end
+            
+            -- Only proceed if chest is not already opened
+            if not isOpened then
+            AutoStrongholdControl.InProgress = true
+            
+            -- Go to loot zone and open the chest
+            local stronghold = workspace.Map.Landmarks:FindFirstChild("Stronghold")
+            if stronghold then
+                local functionalFolder = stronghold:FindFirstChild("Functional", true)
+                if functionalFolder then
+                    local lootZones = functionalFolder:FindFirstChild("LootZones")
+                    if lootZones and lootZones:GetChildren()[4] then
+                        local finalZone = lootZones:GetChildren()[4]:FindFirstChild("Zone")
+                        if finalZone then
+                            rootPart.CFrame = finalZone.CFrame + Vector3.new(0, 5, 0)
+                            task.wait(1)
+                        end
+                    end
+                end
+            end
+            
+            -- Open the diamond chest
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local openChestRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RequestOpenItemChest")
+            openChestRemote:FireServer(diamondChest)
+            
+            AutoStrongholdControl.InProgress = false
+            AutoStrongholdControl.Enabled = false
+            if AutoStrongholdControl.Connection then
+                AutoStrongholdControl.Connection:Disconnect()
+                AutoStrongholdControl.Connection = nil
+            end
+            return
+            end -- Close the isOpened check
+        end
+        
+        -- Case 2: Check if event is ready to start (timer = 00s)
+        local stronghold = workspace.Map.Landmarks:FindFirstChild("Stronghold")
+        if not stronghold then return end
+        
+        local functionalFolder = stronghold:FindFirstChild("Functional", true)
+        if not functionalFolder then return end
+        
+        local signTextLabel = functionalFolder:FindFirstChild("Sign", true)
+            and functionalFolder.Sign:FindFirstChild("SurfaceGui", true)
+            and functionalFolder.Sign.SurfaceGui:FindFirstChild("Frame", true)
+            and functionalFolder.Sign.SurfaceGui.Frame:FindFirstChild("Body", true)
+        
+        if not signTextLabel then return end
+        
+        if signTextLabel.ContentText == "00s" then
+            AutoStrongholdControl.InProgress = true
+            
+            local door = functionalFolder.EntryDoors:FindFirstChild("DoorLeft")
+            if not door or not door.PrimaryPart then 
+                AutoStrongholdControl.InProgress = false
+                return 
+            end
+            
+            rootPart.CFrame = door.PrimaryPart.CFrame * CFrame.new(0, 0, -3)
+            task.wait(1)
+            
+            local prompt = door.Main.ProximityAttachment:FindFirstChild("ProximityInteraction")
+            if prompt and prompt:IsA("ProximityPrompt") then
+                prompt.HoldDuration = 0
+                prompt:InputHoldBegin()
+                task.wait(0.1)
+                prompt:InputHoldEnd()
+                
+                task.wait(1)
+                local triggerZone = functionalFolder.EnemyWaves12.Wave1:FindFirstChild("TriggerZone")
+                if triggerZone then
+                    rootPart.CFrame = triggerZone.CFrame
+                end
+                
+                task.wait(1)
+                local lootZones = functionalFolder:FindFirstChild("LootZones")
+                if lootZones and lootZones:GetChildren()[4] then
+                    local finalZone = lootZones:GetChildren()[4]:FindFirstChild("Zone")
+                    if finalZone then
+                        rootPart.CFrame = finalZone.CFrame + Vector3.new(0, 5, 0)
+                    end
+                end
+                
+                spawn(function()
+                    -- Keep checking until the event completes (diamond chest unlocked)
+                    local diamondChest = workspace.Items:FindFirstChild("Stronghold Diamond Chest")
+                    if diamondChest then
+                        -- Keep checking every 2 seconds until chest is unlocked
+                        repeat 
+                            task.wait(2) 
+                            diamondChest = workspace.Items:FindFirstChild("Stronghold Diamond Chest")
+                        until not diamondChest or diamondChest:GetAttribute("Locked") == false or diamondChest:GetAttribute("Locked") == nil
+                        
+                        -- Reset InProgress flag so the system can detect the unlocked chest
+                        AutoStrongholdControl.InProgress = false
+                        
+                        -- Small delay to ensure the system picks up the unlocked chest
+                        task.wait(1)
+                    else
+                        AutoStrongholdControl.InProgress = false
+                    end
+                end)
+            else
+                AutoStrongholdControl.InProgress = false
+            end
+        end
+    end)
+end
+
+MiscTab:CreateToggle({
+    Name = "🏰 Auto Stronghold",
+    CurrentValue = false,
+    Flag = "Misc_AutoStronghold",
+    Callback = function(v)
+        AutoStrongholdControl.Enabled = v
+        
+        if v then
+            AutoStrongholdControl.Connection = RunService.Heartbeat:Connect(function()
+                if AutoStrongholdControl.Enabled then
+                    AutoStronghold()
+                end
+            end)
+        else
+            if AutoStrongholdControl.Connection then
+                AutoStrongholdControl.Connection:Disconnect()
+                AutoStrongholdControl.Connection = nil
+            end
+            AutoStrongholdControl.InProgress = false
+        end
+    end
+})
+
+-- Fishing Always Correct Control
+local FishingControl = {
+    Enabled = false,
+    Connection = nil,
+    FishingFrame = nil
+}
+
+-- Function to make fishing minigame easy
+local function makeFishingEasy()
+    if not (FishingControl.FishingFrame and FishingControl.FishingFrame.Visible) then
+        return
+    end
+    
+    -- Find the success area in the fishing minigame
+    local successArea = FishingControl.FishingFrame.TimingBar:FindFirstChild("SuccessArea")
+    if successArea then
+        -- Make the green success zone cover the entire bar (100%)
+        successArea.Size = UDim2.new(1, 0, 1, 0)
+        successArea.Position = UDim2.new(0, 0, 0, 0)
+    end
+end
+
+-- Function to find the fishing frame
+local function findFishingFrame()
+    local playerGui = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if playerGui then
+        local interface = playerGui:FindFirstChild("Interface")
+        if interface then
+            return interface:FindFirstChild("FishingCatchFrame")
+        end
+    end
+    return nil
+end
+
+-- Function to start fishing assistance
+local function startFishingAssist()
+    if FishingControl.Enabled then
+        return
+    end
+    
+    FishingControl.Enabled = true
+    
+    -- Wait for fishing frame to exist
+    task.spawn(function()
+        repeat task.wait(0.5) until findFishingFrame()
+        FishingControl.FishingFrame = findFishingFrame()
+        
+        -- Listen for when the fishing minigame becomes visible
+        FishingControl.FishingFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+            if FishingControl.FishingFrame.Visible and FishingControl.Enabled then
+                -- Start the assistance when minigame is visible
+                if not FishingControl.Connection then
+                    FishingControl.Connection = RunService.RenderStepped:Connect(makeFishingEasy)
+                end
+            else
+                -- Stop assistance when minigame ends
+                if FishingControl.Connection then
+                    FishingControl.Connection:Disconnect()
+                    FishingControl.Connection = nil
+                end
+            end
+        end)
+    end)
+end
+
+-- Function to stop fishing assistance
+local function stopFishingAssist()
+    FishingControl.Enabled = false
+    if FishingControl.Connection then
+        FishingControl.Connection:Disconnect()
+        FishingControl.Connection = nil
+    end
+end
+
+MiscTab:CreateToggle({
+    Name = "🎣 Fishing Always Correct",
+    CurrentValue = false,
+    Flag = "Misc_FishingAlwaysCorrect",
+    Callback = function(v)
+        if v then
+            startFishingAssist()
+        else
+            stopFishingAssist()
+        end
+    end
+})
+
 -- Player GUI Controls
 PlayerTab:CreateToggle({
     Name = "Enable Speed",
@@ -5137,6 +5585,43 @@ PlayerTab:CreateDropdown({
                 Image = 4483362458,
             })
         end
+    end
+})
+
+-- Auto Trap Follow Player
+PlayerTab:CreateLabel("🪤 Auto Trap Follow Player:")
+PlayerTab:CreateLabel("Select a target player and enable to make all bear traps follow them.")
+
+local TrapTargetDropdown
+TrapTargetDropdown = PlayerTab:CreateDropdown({
+    Name = "Target Player",
+    Options = GetPlayerNames(),
+    CurrentOption = {"None"},
+    Flag = "Trap_TargetPlayer",
+    Callback = function(options)
+        TrapControl.TargetPlayer = options[1]
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Enable Auto Trap",
+    CurrentValue = false,
+    Flag = "Trap_AutoTrapEnabled",
+    Callback = function(v)
+        TrapControl.AutoTrapEnabled = v
+        
+        if v then
+        else
+            CleanupTraps()
+        end
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Refresh Player List",
+    Callback = function()
+        local newOptions = GetPlayerNames()
+        TrapTargetDropdown:Refresh(newOptions)
     end
 })
 
@@ -5471,6 +5956,19 @@ CraftingTab:CreateSlider({
     Flag = "Crafting_TeleportHeight",
     Callback = function(v)
         CraftingControl.TeleportHeight = v
+    end
+})
+
+CraftingTab:CreateSlider({
+    Name = "Teleport Cooldown",
+    Range = {0, 2},
+    Increment = 0.1,
+    Suffix = " seconds",
+    CurrentValue = 15,
+    Flag = "Crafting_TeleportCooldown",
+    Callback = function(v)
+        CraftingControl.TeleportCooldown = v
+        print("🔄 Teleport cooldown updated to: " .. v .. " seconds")
     end
 })
 
